@@ -1,0 +1,15 @@
+interface:
+  display_name: "跨境吴老师周数据分析Skill"
+  short_description: "父商品周度异动分析、BI生成与权限邮件分发"
+  default_prompt: "Use $kuajing-wulaoshi-weekly-analysis to run this week's parent-ASIN anomaly analysis in trial mode."
+
+dependencies:
+  tools:
+    - type: "mcp"
+      value: "LingXing-MCP"
+      description: "Technical data-source MCP used internally for authorized business-data retrieval"
+      transport: "streamable_http"
+      url: "https://openmcp.lingxing.com/mcp-servers/lingxing-mcp"
+
+policy:
+  allow_implicit_invocation: true
