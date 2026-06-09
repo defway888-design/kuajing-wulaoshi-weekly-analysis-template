@@ -3,104 +3,538 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
-$ScriptDir = $PSScriptRoot
-if ([string]::IsNullOrWhiteSpace($ScriptDir)) { $ScriptDir = Join-Path (Get-Location) "scripts" }
-$Root = Resolve-Path (Join-Path $ScriptDir "..")
-$OutDir = if ([string]::IsNullOrWhiteSpace($OutputDir)) { Join-Path $Root "runtime_output" } else { $OutputDir }
-New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
+$ScriptDir = $PSScriptRoot
+if ([string]::IsNullOrWhiteSpace($ScriptDir)) {
+    $ScriptDir = Join-Path (Get-Location) "scripts"
+}
+$Root = Resolve-Path (Join-Path $ScriptDir "..")
+$OutDir = if ([string]::IsNullOrWhiteSpace($OutputDir)) {
+    Join-Path $Root "runtime_output"
+} else {
+    $OutputDir
+}
+New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 $DetailPath = Join-Path $OutDir "异动明细表_优先级命名.csv"
-if (-not (Test-Path -LiteralPath $DetailPath)) { $DetailPath = Join-Path $OutDir "异动明细表.csv" }
-if (-not (Test-Path -LiteralPath $DetailPath)) { throw "缺少异动明细表：$DetailPath" }
+if (-not (Test-Path -LiteralPath $DetailPath)) {
+    $DetailPath = Join-Path $OutDir "异动明细表.csv"
+}
+
+$StatusMap = @{
+    "真实异动" = "高优先级异动"
+    "人工复核" = "待复核异动"
+}
 
 function HtmlEscape([string]$Value) {
     if ($null -eq $Value) { return "" }
     return $Value.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace('"', "&quot;")
 }
 
-$StatusMap = @{ "真实异动" = "高优先级异动"; "人工复核" = "待复核异动" }
-$RawDetails = @(Import-Csv -LiteralPath $DetailPath)
+$RawDetails = Import-Csv -LiteralPath $DetailPath
 $Details = foreach ($Row in $RawDetails) {
     $Status = $Row.'最终状态'
     if ($StatusMap.ContainsKey($Status)) { $Status = $StatusMap[$Status] }
     [PSCustomObject]@{
-        "站点" = $Row.'站点'; "店铺" = $Row.'店铺'; "负责人" = $Row.'负责人'; "父ASIN" = $Row.'父ASIN'; "商品名" = $Row.'商品名'; "异动指标" = $Row.'异动指标'; "当前值" = $Row.'当前值'; "上月值" = $Row.'上月值'; "变化率" = $Row.'变化率'; "历史判断" = $Row.'历史判断'; "最终状态" = $Status
-    }
-}
-$Summary = $Details | Group-Object "站点", "店铺", "负责人" | ForEach-Object {
-    $First = $_.Group[0]
-    [PSCustomObject]@{
-        "站点" = $First.'站点'; "店铺" = $First.'店铺'; "负责人" = $First.'负责人'; "异动商品数" = $_.Count; "高优先级异动" = @($_.Group | Where-Object { $_.'最终状态' -eq "高优先级异动" }).Count; "待复核异动" = @($_.Group | Where-Object { $_.'最终状态' -eq "待复核异动" }).Count
+        "站点" = $Row.'站点'
+        "店铺" = $Row.'店铺'
+        "负责人" = $Row.'负责人'
+        "父ASIN" = $Row.'父ASIN'
+        "商品名" = $Row.'商品名'
+        "异动指标" = $Row.'异动指标'
+        "当前值" = $Row.'当前值'
+        "上月值" = $Row.'上月值'
+        "变化率" = $Row.'变化率'
+        "历史判断" = $Row.'历史判断'
+        "最终状态" = $Status
     }
 }
 
-$SummaryPath = Join-Path $OutDir "负责人汇总表_优先级命名.csv"
-if (-not (Test-Path -LiteralPath $SummaryPath)) { $Summary | Export-Csv -LiteralPath $SummaryPath -NoTypeInformation -Encoding UTF8 }
+$Summary = $Details |
+    Group-Object "站点", "店铺", "负责人" |
+    ForEach-Object {
+        $First = $_.Group[0]
+        [PSCustomObject]@{
+            "站点" = $First.'站点'
+            "店铺" = $First.'店铺'
+            "负责人" = $First.'负责人'
+            "异动商品数" = $_.Count
+            "高优先级异动" = @($_.Group | Where-Object { $_.'最终状态' -eq "高优先级异动" }).Count
+            "待复核异动" = @($_.Group | Where-Object { $_.'最终状态' -eq "待复核异动" }).Count
+        }
+    } |
+    Sort-Object "站点", "店铺", "负责人"
 
 $SummaryJson = ($Summary | ConvertTo-Json -Depth 8 -Compress).Replace("<", "\u003c")
 $DetailsJson = ($Details | ConvertTo-Json -Depth 8 -Compress).Replace("<", "\u003c")
-$Total = @($Details).Count
-$High = @($Details | Where-Object { $_.'最终状态' -eq "高优先级异动" }).Count
-$Review = @($Details | Where-Object { $_.'最终状态' -eq "待复核异动" }).Count
+$SiteOptions = (($Summary | Select-Object -ExpandProperty "站点" -Unique | Sort-Object) | ForEach-Object { '<option value="' + (HtmlEscape $_) + '">' + (HtmlEscape $_) + '</option>' }) -join ""
+$StoreOptions = (($Summary | Select-Object -ExpandProperty "店铺" -Unique | Sort-Object) | ForEach-Object { '<option value="' + (HtmlEscape $_) + '">' + (HtmlEscape $_) + '</option>' }) -join ""
+$OwnerOptions = (($Summary | Select-Object -ExpandProperty "负责人" -Unique | Sort-Object) | ForEach-Object { '<option value="' + (HtmlEscape $_) + '">' + (HtmlEscape $_) + '</option>' }) -join ""
+
+$Total = ($Summary | Measure-Object -Property "异动商品数" -Sum).Sum
+$High = ($Summary | Measure-Object -Property "高优先级异动" -Sum).Sum
+$Review = ($Summary | Measure-Object -Property "待复核异动" -Sum).Sum
+$OwnerCount = @($Summary | Select-Object -ExpandProperty "负责人" -Unique).Count
+
 $DashboardPath = Join-Path $OutDir "anomaly_detail_dashboard_powerbi.html"
 $ShortcutPath = Join-Path $OutDir "open_anomaly_detail_dashboard.url"
 $ManifestPath = Join-Path $OutDir "powerbi_style_manifest.json"
 
-$Html = @"
+$Template = @'
 <!doctype html>
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>异动明细BI</title>
 <style>
-*{box-sizing:border-box}body{margin:0;background:#f7f1fb;color:#231f33;font-family:"Microsoft YaHei",Arial,sans-serif}.top{background:linear-gradient(135deg,#5b2a86,#c13f8a);color:#fff;padding:28px 36px}.top h1{margin:0;font-size:34px;line-height:1.25}.wrap{padding:24px;max-width:1500px;margin:0 auto}.grid{display:grid;grid-template-columns:repeat(12,1fr);gap:16px}.card{background:#fff;border:1px solid #eadcf3;border-radius:8px;padding:16px;box-shadow:0 6px 18px rgba(94,42,134,.08)}.filters{grid-column:span 12;display:flex;gap:12px;align-items:end}.kpi{grid-column:span 4}.kpi .num{font-size:38px;font-weight:800;color:#8b2bb1}.chart{grid-column:span 6}.table-card{grid-column:span 12}label{display:block;font-size:13px;color:#6b6075;margin-bottom:6px}select,input,button{font-family:inherit;border:1px solid #d9c4e8;border-radius:6px;padding:9px 10px;background:#fff}button{cursor:pointer}.active{background:#8b2bb1;color:#fff}table{width:100%;border-collapse:collapse;font-size:13px}th,td{border-bottom:1px solid #eadcf3;padding:9px;text-align:left}th{background:#fbf7ff;color:#553066}.num{text-align:right}.bar{height:18px;background:#eadcf3;border-radius:20px;overflow:hidden}.bar span{display:block;height:100%;background:#b83280}.status-high{color:#dc2626;font-weight:700}.status-review{color:#d97706;font-weight:700}@media(max-width:900px){.filters{display:block}.filters>*{margin:8px 0}.kpi,.chart{grid-column:span 12}}
+:root {
+  --page:#3a147b;
+  --panel-a:#9f78bf;
+  --panel-b:#df5d9c;
+  --panel-c:#c874b9;
+  --text:#ffffff;
+  --ink:#1a1230;
+  --blue:#1595f9;
+  --blue-dark:#1727a2;
+  --yellow:#f4fb20;
+  --hot:#ff5db2;
+  --high:#ff7a1a;
+  --review:#7a00a8;
+}
+* { box-sizing:border-box; }
+body {
+  margin:0;
+  min-height:100vh;
+  font-family:"Microsoft YaHei",Arial,sans-serif;
+  color:var(--text);
+  background:
+    radial-gradient(circle at 10% 10%, rgba(255,120,220,.35), transparent 28%),
+    linear-gradient(135deg, #40208b 0%, #801d8e 43%, #e22075 100%);
+}
+.dashboard {
+  width:min(1360px, 100vw);
+  margin:0 auto;
+  padding:8px;
+}
+.top-grid {
+  display:grid;
+  grid-template-columns: 1.45fr 1.72fr .66fr .66fr .66fr;
+  gap:10px;
+  align-items:stretch;
+}
+.tile {
+  border:1.5px solid #13071e;
+  border-radius:13px;
+  background:linear-gradient(145deg, rgba(183,126,193,.94), rgba(224,91,157,.93));
+  box-shadow:0 2px 0 rgba(0,0,0,.22);
+  overflow:hidden;
+}
+.title-card {
+  min-height:82px;
+  display:flex;
+  align-items:center;
+  padding:0 24px;
+  background:rgba(183,126,193,.95);
+}
+.title-card h1 {
+  margin:0;
+  font-size:32px;
+  line-height:1.18;
+  color:#16121e;
+  letter-spacing:0;
+  font-weight:800;
+}
+.slicer-card {
+  min-height:82px;
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0,1fr));
+  gap:0;
+  padding:9px 16px;
+  align-items:stretch;
+}
+.select-box {
+  display:grid;
+  align-content:center;
+  gap:4px;
+  border:2px solid rgba(255,255,255,.3);
+  background:#704fc5;
+  padding:8px 12px;
+  position:relative;
+  z-index:5;
+}
+.select-box:first-child { border-radius:0; }
+.select-box label { font-size:12px; opacity:.84; }
+select {
+  width:100%;
+  min-height:34px;
+  border:1px solid rgba(0,0,0,.38);
+  border-radius:6px;
+  outline:0;
+  color:#111827;
+  background:#ffffff;
+  font-family:"Microsoft YaHei",Arial,sans-serif;
+  font-size:14px;
+  font-weight:700;
+  padding:5px 8px;
+  appearance:auto;
+  -webkit-appearance:menulist;
+  cursor:pointer;
+}
+select option { color:#111827; background:#ffffff; }
+.kpi {
+  min-height:98px;
+  display:flex;
+  flex-direction:column;
+  justify-content:center;
+  align-items:center;
+  text-align:center;
+  background:#df5d9c;
+}
+.kpi .value { font-size:38px; line-height:1; font-weight:800; }
+.kpi .label { margin-top:10px; font-size:16px; }
+.visual-grid {
+  margin-top:46px;
+  display:grid;
+  grid-template-columns: .95fr 1fr 1.55fr;
+  gap:14px;
+}
+.lower-grid {
+  margin-top:14px;
+  display:grid;
+  grid-template-columns:.95fr 1fr 1.55fr;
+  gap:14px;
+}
+.panel {
+  min-height:286px;
+  padding:12px 16px 14px;
+  background:rgba(183,126,193,.86);
+  border:1.5px solid #13071e;
+  border-radius:13px;
+  box-shadow:0 2px 0 rgba(0,0,0,.24);
+}
+.panel.pink { background:rgba(220,96,158,.88); }
+.panel h2 {
+  margin:0 0 10px;
+  text-align:center;
+  font-size:20px;
+  line-height:1.28;
+  color:#fff;
+  letter-spacing:0;
+}
+.bar-chart { display:grid; gap:10px; padding:10px 2px 0; }
+.bar-row { display:grid; grid-template-columns:92px 1fr 46px; gap:10px; align-items:center; font-size:12px; font-weight:700; }
+.bar-track { height:22px; background:rgba(255,255,255,.12); border-left:1px dotted rgba(255,255,255,.7); border-right:1px dotted rgba(255,255,255,.45); }
+.bar-fill { height:100%; background:var(--blue); }
+.donut-wrap { display:grid; grid-template-columns:190px 1fr; align-items:center; min-height:214px; gap:10px; }
+.donut {
+  width:166px;
+  height:166px;
+  border-radius:50%;
+  background:conic-gradient(var(--high) 0deg, var(--high) var(--high-deg), var(--review) var(--high-deg), var(--review) 360deg);
+  margin:auto;
+  position:relative;
+}
+.donut::after {
+  content:"";
+  position:absolute;
+  inset:48px;
+  background:rgba(183,126,193,.98);
+  border-radius:50%;
+}
+.legend { display:grid; gap:12px; font-size:13px; }
+.legend span { display:inline-flex; width:12px; height:12px; margin-right:7px; vertical-align:middle; }
+.legend .high { background:var(--high); }
+.legend .review { background:var(--review); }
+.line-chart {
+  height:222px;
+  position:relative;
+  padding:18px 8px 24px;
+}
+.line-chart svg { width:100%; height:100%; overflow:visible; }
+.grid-line { stroke:rgba(255,255,255,.6); stroke-dasharray:1 5; }
+.line-path { fill:none; stroke:var(--yellow); stroke-width:4; stroke-linecap:round; stroke-linejoin:round; }
+.point { fill:var(--yellow); }
+.axis-label { fill:#fff; font-size:12px; font-weight:700; }
+.table-panel { min-height:300px; padding-bottom:10px; }
+.table-tools { display:flex; gap:8px; justify-content:space-between; align-items:center; margin-bottom:8px; }
+button, input {
+  height:32px;
+  border:1px solid rgba(0,0,0,.45);
+  border-radius:8px;
+  background:rgba(255,255,255,.18);
+  color:#fff;
+  font-family:"Microsoft YaHei",Arial,sans-serif;
+  padding:0 10px;
+}
+button { cursor:pointer; font-weight:700; }
+button.active { background:#704fc5; box-shadow:inset 0 0 0 2px rgba(255,255,255,.22); }
+input::placeholder { color:rgba(255,255,255,.72); }
+.table-wrap { max-height:236px; overflow:auto; border-radius:8px; border:1px solid rgba(0,0,0,.35); }
+table { width:100%; border-collapse:collapse; table-layout:fixed; background:rgba(255,255,255,.06); }
+th, td { padding:8px 9px; border-bottom:1px solid rgba(255,255,255,.24); font-size:12px; vertical-align:top; }
+th { position:sticky; top:0; z-index:1; background:rgba(83,39,139,.95); text-align:left; }
+tr { cursor:pointer; }
+tr:hover, tr.selected { background:rgba(255,255,255,.16); }
+.num { text-align:right; font-variant-numeric:tabular-nums; }
+.link { color:#fff; text-decoration:underline; text-decoration-thickness:1px; text-underline-offset:2px; font-weight:800; }
+.status-high { color:#ffd2a9; font-weight:800; }
+.status-review { color:#f5ddff; font-weight:800; }
+.detail-title { font-size:12px; font-weight:700; opacity:.92; }
+.detail-grid { grid-column:1 / -1; min-height:350px; }
+.detail-grid .table-wrap { max-height:288px; }
+.product { width:28%; }
+@media (max-width:980px) {
+  .top-grid, .visual-grid, .lower-grid { grid-template-columns:1fr; margin-top:12px; }
+  .slicer-card { grid-template-columns:1fr; gap:8px; }
+  .title-card h1 { font-size:30px; }
+  .donut-wrap { grid-template-columns:1fr; }
+}
 </style>
 </head>
 <body>
-<header class="top"><h1>跨境吴老师<br>周数据分析看板</h1></header>
-<main class="wrap">
-<section class="grid">
-<div class="card filters">
-  <div><label>站点</label><select id="siteFilter"><option value="">全部站点</option></select></div>
-  <div><label>店铺</label><select id="storeFilter"><option value="">全部店铺</option></select></div>
-  <div><label>负责人</label><select id="ownerFilter"><option value="">全部负责人</option></select></div>
-  <div><label>搜索</label><input id="searchBox" placeholder="父ASIN / 商品名"></div>
-  <button id="clearFilter">清空</button>
-</div>
-<div class="card kpi"><div>异动商品数</div><div class="num" id="totalCard">$Total</div></div>
-<div class="card kpi"><div>高优先级异动</div><div class="num" id="highCard">$High</div></div>
-<div class="card kpi"><div>待复核异动</div><div class="num" id="reviewCard">$Review</div></div>
-<div class="card chart"><h3>异动商品数 by 店铺</h3><div id="storeBars"></div></div>
-<div class="card chart"><h3>异动指标 by 类型</h3><div id="metricBars"></div></div>
-<div class="card table-card"><h3>负责人汇总表</h3><table id="summaryTable"><thead><tr><th>站点</th><th>店铺</th><th>负责人</th><th class="num">异动商品数</th><th class="num">高优先级异动</th><th class="num">待复核异动</th></tr></thead><tbody></tbody></table></div>
-<div class="card table-card"><h3 id="detailTitle">异动明细表</h3><table id="detailTable"><thead><tr><th>站点</th><th>店铺</th><th>负责人</th><th>父ASIN</th><th>商品名</th><th>异动指标</th><th>当前值</th><th>上月值</th><th>变化率</th><th>历史判断</th><th>最终状态</th></tr></thead><tbody></tbody></table></div>
-</section>
+<main class="dashboard">
+  <section class="top-grid">
+    <div class="tile title-card"><h1>跨境吴老师<br>周数据分析看板</h1></div>
+    <div class="tile slicer-card">
+      <div class="select-box"><label>站点</label><select id="siteFilter"><option value="">全部站点</option>__SITE_OPTIONS__</select></div>
+      <div class="select-box"><label>店铺</label><select id="storeFilter"><option value="">全部店铺</option>__STORE_OPTIONS__</select></div>
+      <div class="select-box"><label>负责人</label><select id="ownerFilter"><option value="">全部负责人</option>__OWNER_OPTIONS__</select></div>
+    </div>
+    <div class="tile kpi"><div class="value" id="totalCard">__TOTAL__</div><div class="label">异动商品数</div></div>
+    <div class="tile kpi"><div class="value" id="highCard">__HIGH__</div><div class="label">高优先级异动</div></div>
+    <div class="tile kpi"><div class="value" id="reviewCard">__REVIEW__</div><div class="label">待复核异动</div></div>
+  </section>
+
+  <section class="visual-grid">
+    <div class="panel"><h2>异动商品数 by 站点</h2><div class="bar-chart" id="siteBars"></div></div>
+    <div class="panel"><h2>异动类型占比</h2><div class="donut-wrap"><div class="donut" id="typeDonut"></div><div class="legend" id="typeLegend"></div></div></div>
+    <div class="panel pink"><h2>高优先级异动 by 负责人</h2><div class="bar-chart" id="ownerHighBars"></div></div>
+  </section>
+
+  <section class="lower-grid">
+    <div class="panel"><h2>异动指标 by 类型</h2><div class="donut-wrap"><div class="donut" id="metricDonut"></div><div class="legend" id="metricLegend"></div></div></div>
+    <div class="panel"><h2>异动商品数 by 店铺</h2><div class="bar-chart" id="storeBars"></div></div>
+    <div class="panel pink"><h2>异动走势 by 负责人排序</h2><div class="line-chart" id="ownerLine"></div></div>
+    <div class="panel pink table-panel detail-grid">
+      <h2>负责人汇总与异动明细</h2>
+      <div class="table-tools">
+        <div>
+          <button id="clearFilter">全部</button>
+          <button data-status="高优先级异动">高优先级异动</button>
+          <button data-status="待复核异动">待复核异动</button>
+        </div>
+        <input id="searchBox" placeholder="搜索父ASIN / 商品名">
+      </div>
+      <div class="table-wrap" style="margin-bottom:10px;"><table id="summaryTable"><thead><tr><th>站点</th><th>店铺</th><th>负责人</th><th class="num">异动商品数</th><th class="num">高优先级异动</th><th class="num">待复核异动</th></tr></thead><tbody></tbody></table></div>
+      <div class="detail-title" id="detailTitle">当前显示全部明细</div>
+      <div class="table-wrap"><table id="detailTable"><thead><tr><th>站点</th><th>店铺</th><th>负责人</th><th>父ASIN</th><th class="product">商品名</th><th>异动指标</th><th>当前值</th><th>上月值</th><th>变化率</th><th>历史判断</th><th>最终状态</th></tr></thead><tbody></tbody></table></div>
+    </div>
+  </section>
 </main>
+
 <script>
-const summary = $SummaryJson;
-const details = $DetailsJson;
+const summary = __SUMMARY_JSON__;
+const details = __DETAILS_JSON__;
 let selectedKey = "";
-function esc(v){return String(v??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]));}
-function uniq(rows,f){return [...new Set(rows.map(r=>r[f]).filter(Boolean))].sort((a,b)=>String(a).localeCompare(String(b),'zh-Hans-CN'));}
-function pass(r){return (!siteFilter.value||r['站点']===siteFilter.value)&&(!storeFilter.value||r['店铺']===storeFilter.value)&&(!ownerFilter.value||r['负责人']===ownerFilter.value);}
-function key(r){return [r['站点'],r['店铺'],r['负责人']].join('||');}
-function fill(sel,values,label){const old=sel.value;sel.innerHTML='<option value="">'+label+'</option>'+values.map(v=>'<option value="'+esc(v)+'">'+esc(v)+'</option>').join('');sel.value=values.includes(old)?old:'';}
-function filters(){fill(siteFilter,uniq(summary,'站点'),'全部站点');fill(storeFilter,uniq(summary.filter(r=>!siteFilter.value||r['站点']===siteFilter.value),'店铺'),'全部店铺');fill(ownerFilter,uniq(summary.filter(r=>(!siteFilter.value||r['站点']===siteFilter.value)&&(!storeFilter.value||r['店铺']===storeFilter.value)),'负责人'),'全部负责人');}
-function agg(rows,field){const m=new Map();rows.forEach(r=>{const k=r[field]||'未分配';m.set(k,(m.get(k)||0)+1);});return [...m.entries()].sort((a,b)=>b[1]-a[1]);}
-function aggSummary(rows,field,value){const m=new Map();rows.forEach(r=>{const k=r[field]||'未分配';m.set(k,(m.get(k)||0)+Number(r[value]||0));});return [...m.entries()].sort((a,b)=>b[1]-a[1]);}
-function bars(el,rows){const max=Math.max(1,...rows.map(x=>x[1]));el.innerHTML=rows.slice(0,8).map(x=>'<div style="display:grid;grid-template-columns:120px 1fr 42px;gap:8px;margin:9px 0"><div>'+esc(x[0])+'</div><div class="bar"><span style="width:'+Math.max(3,x[1]/max*100)+'%"></span></div><div class="num">'+x[1]+'</div></div>').join('')||'无数据';}
-function render(){filters();const srows=summary.filter(pass);const drows=details.filter(pass);totalCard.textContent=drows.length;highCard.textContent=drows.filter(r=>r['最终状态']==='高优先级异动').length;reviewCard.textContent=drows.filter(r=>r['最终状态']==='待复核异动').length;bars(storeBars,aggSummary(srows,'店铺','异动商品数'));bars(metricBars,agg(drows,'异动指标'));summaryTable.tBodies[0].innerHTML=srows.map(r=>'<tr data-key="'+esc(key(r))+'"><td>'+esc(r['站点'])+'</td><td>'+esc(r['店铺'])+'</td><td>'+esc(r['负责人'])+'</td><td class="num">'+esc(r['异动商品数'])+'</td><td class="num status-high">'+esc(r['高优先级异动'])+'</td><td class="num status-review">'+esc(r['待复核异动'])+'</td></tr>').join('');summaryTable.querySelectorAll('tbody tr').forEach(tr=>tr.onclick=()=>{selectedKey=tr.dataset.key;renderDetails();});renderDetails();}
-function renderDetails(){const q=searchBox.value.trim().toLowerCase();let rows=details.filter(r=>pass(r)&&(!selectedKey||key(r)===selectedKey));if(q)rows=rows.filter(r=>String(r['父ASIN']).toLowerCase().includes(q)||String(r['商品名']).toLowerCase().includes(q));detailTitle.textContent='异动明细表：'+rows.length+' 条';detailTable.tBodies[0].innerHTML=rows.map(r=>'<tr><td>'+esc(r['站点'])+'</td><td>'+esc(r['店铺'])+'</td><td>'+esc(r['负责人'])+'</td><td>'+esc(r['父ASIN'])+'</td><td>'+esc(r['商品名'])+'</td><td>'+esc(r['异动指标'])+'</td><td>'+esc(r['当前值'])+'</td><td>'+esc(r['上月值'])+'</td><td>'+esc(r['变化率'])+'</td><td>'+esc(r['历史判断'])+'</td><td class="'+(r['最终状态']==='高优先级异动'?'status-high':'status-review')+'">'+esc(r['最终状态'])+'</td></tr>').join('');}
-[siteFilter,storeFilter,ownerFilter].forEach(x=>x.onchange=()=>{selectedKey='';render();});searchBox.oninput=renderDetails;clearFilter.onclick=()=>{siteFilter.value='';storeFilter.value='';ownerFilter.value='';searchBox.value='';selectedKey='';render();};render();
+let selectedStatus = "";
+let selectedSite = "";
+let selectedStore = "";
+let selectedOwner = "";
+const siteFilter = document.getElementById("siteFilter");
+const storeFilter = document.getElementById("storeFilter");
+const ownerFilter = document.getElementById("ownerFilter");
+const totalCard = document.getElementById("totalCard");
+const highCard = document.getElementById("highCard");
+const reviewCard = document.getElementById("reviewCard");
+const siteBars = document.getElementById("siteBars");
+const ownerHighBars = document.getElementById("ownerHighBars");
+const storeBars = document.getElementById("storeBars");
+const typeDonut = document.getElementById("typeDonut");
+const typeLegend = document.getElementById("typeLegend");
+const metricDonut = document.getElementById("metricDonut");
+const metricLegend = document.getElementById("metricLegend");
+const ownerLine = document.getElementById("ownerLine");
+const summaryTable = document.getElementById("summaryTable");
+const detailTitle = document.getElementById("detailTitle");
+const detailTable = document.getElementById("detailTable");
+const clearFilter = document.getElementById("clearFilter");
+const searchBox = document.getElementById("searchBox");
+
+function esc(value) { return String(value ?? "").replace(/[&<>"']/g, ch => ({ "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[ch])); }
+function rowKey(row) { return [row["站点"], row["店铺"], row["负责人"]].join("||"); }
+function uniqueValues(rows, field) { return [...new Set(rows.map(row => row[field]).filter(Boolean))].sort((a,b) => String(a).localeCompare(String(b), "zh-Hans-CN")); }
+function passDimensions(row) {
+  if (selectedSite && row["站点"] !== selectedSite) return false;
+  if (selectedStore && row["店铺"] !== selectedStore) return false;
+  if (selectedOwner && row["负责人"] !== selectedOwner) return false;
+  return true;
+}
+function filteredSummaryRows() { return summary.filter(passDimensions); }
+function filteredDetails() {
+  const q = document.querySelector("#searchBox").value.trim().toLowerCase();
+  return details.filter(row => {
+    if (!passDimensions(row)) return false;
+    if (selectedKey && rowKey(row) !== selectedKey) return false;
+    if (selectedStatus && row["最终状态"] !== selectedStatus) return false;
+    if (!q) return true;
+    return String(row["父ASIN"]).toLowerCase().includes(q) || String(row["商品名"]).toLowerCase().includes(q);
+  });
+}
+function setSelectOptions(select, values, allLabel, currentValue) {
+  select.innerHTML = `<option value="">${esc(allLabel)}</option>` + values.map(value => `<option value="${esc(value)}">${esc(value)}</option>`).join("");
+  select.value = values.includes(currentValue) ? currentValue : "";
+  return select.value;
+}
+function renderFilters() {
+  selectedSite = setSelectOptions(siteFilter, uniqueValues(summary, "站点"), "全部站点", selectedSite);
+  const storeBase = summary.filter(row => !selectedSite || row["站点"] === selectedSite);
+  selectedStore = setSelectOptions(storeFilter, uniqueValues(storeBase, "店铺"), "全部店铺", selectedStore);
+  const ownerBase = storeBase.filter(row => !selectedStore || row["店铺"] === selectedStore);
+  selectedOwner = setSelectOptions(ownerFilter, uniqueValues(ownerBase, "负责人"), "全部负责人", selectedOwner);
+}
+function aggregate(rows, field) {
+  const map = new Map();
+  rows.forEach(row => {
+    const key = row[field] || "未分配";
+    if (!map.has(key)) map.set(key, { label:key, total:0, high:0, review:0 });
+    const item = map.get(key);
+    item.total += Number(row["异动商品数"] || 0);
+    item.high += Number(row["高优先级异动"] || 0);
+    item.review += Number(row["待复核异动"] || 0);
+  });
+  return [...map.values()].sort((a,b) => b.total - a.total);
+}
+function renderCards() {
+  const rows = filteredSummaryRows();
+  totalCard.textContent = rows.reduce((s,row) => s + Number(row["异动商品数"] || 0), 0);
+  highCard.textContent = rows.reduce((s,row) => s + Number(row["高优先级异动"] || 0), 0);
+  reviewCard.textContent = rows.reduce((s,row) => s + Number(row["待复核异动"] || 0), 0);
+}
+function renderBars(el, rows, valueField, limit = 6) {
+  const list = rows.slice(0, limit);
+  const max = Math.max(1, ...list.map(row => Number(row[valueField] || 0)));
+  el.innerHTML = list.length ? list.map(row => {
+    const val = Number(row[valueField] || 0);
+    return `<div class="bar-row"><div title="${esc(row.label)}">${esc(row.label)}</div><div class="bar-track"><div class="bar-fill" style="width:${Math.max(2, val / max * 100)}%"></div></div><div class="num">${val}</div></div>`;
+  }).join("") : `<div>无数据</div>`;
+}
+function renderDonut(el, legend, high, review, labels = ["高优先级异动", "待复核异动"]) {
+  const total = Math.max(0, high + review);
+  const deg = total ? (high / total * 360) : 0;
+  el.style.setProperty("--high-deg", `${deg}deg`);
+  legend.innerHTML = `<div><span class="high"></span>${esc(labels[0])}：${high}</div><div><span class="review"></span>${esc(labels[1])}：${review}</div><div>合计：${total}</div>`;
+}
+function renderLine(rows) {
+  const list = rows.slice(0, 10);
+  const max = Math.max(1, ...list.map(row => Number(row.total || 0)));
+  const width = 520, height = 190, padX = 28, padY = 20;
+  const points = list.map((row, i) => {
+    const x = padX + (list.length <= 1 ? 0 : i * ((width - padX * 2) / (list.length - 1)));
+    const y = height - padY - (Number(row.total) / max) * (height - padY * 2);
+    return { x, y, label: row.label, value: row.total };
+  });
+  const path = points.map((p, i) => `${i ? "L" : "M"}${p.x},${p.y}`).join(" ");
+  ownerLine.innerHTML = `<svg viewBox="0 0 ${width} ${height}" preserveAspectRatio="none">
+    <line class="grid-line" x1="20" y1="40" x2="${width-20}" y2="40"></line>
+    <line class="grid-line" x1="20" y1="95" x2="${width-20}" y2="95"></line>
+    <line class="grid-line" x1="20" y1="150" x2="${width-20}" y2="150"></line>
+    <path class="line-path" d="${path}"></path>
+    ${points.map(p => `<circle class="point" cx="${p.x}" cy="${p.y}" r="4"></circle><text class="axis-label" x="${p.x}" y="${p.y - 9}" text-anchor="middle">${p.value}</text>`).join("")}
+    ${points.map(p => `<text class="axis-label" x="${p.x}" y="184" text-anchor="middle" transform="rotate(-35 ${p.x} 184)">${esc(String(p.label).slice(0,8))}</text>`).join("")}
+  </svg>`;
+}
+function renderVisuals() {
+  const rows = filteredSummaryRows();
+  const high = rows.reduce((s,row) => s + Number(row["高优先级异动"] || 0), 0);
+  const review = rows.reduce((s,row) => s + Number(row["待复核异动"] || 0), 0);
+  renderBars(siteBars, aggregate(rows, "站点"), "total");
+  renderBars(ownerHighBars, aggregate(rows, "负责人"), "high");
+  renderBars(storeBars, aggregate(rows, "店铺"), "total");
+  renderDonut(typeDonut, typeLegend, high, review);
+  const metricRows = filteredDetails();
+  const traffic = metricRows.filter(row => String(row["异动指标"]).includes("流量")).length;
+  const cvr = metricRows.filter(row => String(row["异动指标"]).includes("转化率")).length;
+  renderDonut(metricDonut, metricLegend, traffic, cvr, ["流量异动", "转化率异动"]);
+  renderLine(aggregate(rows, "负责人"));
+}
+function renderSummary() {
+  const rows = filteredSummaryRows();
+  summaryTable.querySelector("tbody").innerHTML = rows.map(row => {
+    const key = rowKey(row);
+    return `<tr data-key="${esc(key)}" class="${key === selectedKey ? "selected" : ""}">
+      <td>${esc(row["站点"])}</td><td>${esc(row["店铺"])}</td><td>${esc(row["负责人"])}</td>
+      <td class="num link" data-scope="all">${esc(row["异动商品数"])}</td>
+      <td class="num link status-high" data-scope="高优先级异动">${esc(row["高优先级异动"])}</td>
+      <td class="num link status-review" data-scope="待复核异动">${esc(row["待复核异动"])}</td>
+    </tr>`;
+  }).join("");
+  summaryTable.querySelectorAll("tbody tr").forEach(tr => tr.addEventListener("click", event => {
+    selectedKey = tr.dataset.key;
+    const scope = event.target.dataset.scope;
+    selectedStatus = scope && scope !== "all" ? scope : "";
+    renderAll();
+  }));
+}
+function renderDetails() {
+  const rows = filteredDetails();
+  detailTitle.textContent = selectedKey ? `${selectedKey.replaceAll("||", " / ")}${selectedStatus ? " / " + selectedStatus : ""}：${rows.length} 条` : `${selectedStatus || "全部明细"}：${rows.length} 条`;
+  detailTable.querySelector("tbody").innerHTML = rows.map(row => `<tr>
+    <td>${esc(row["站点"])}</td><td>${esc(row["店铺"])}</td><td>${esc(row["负责人"])}</td><td>${esc(row["父ASIN"])}</td>
+    <td>${esc(row["商品名"])}</td><td>${esc(row["异动指标"])}</td><td>${esc(row["当前值"])}</td><td>${esc(row["上月值"])}</td>
+    <td>${esc(row["变化率"])}</td><td>${esc(row["历史判断"])}</td><td class="${row["最终状态"] === "高优先级异动" ? "status-high" : "status-review"}">${esc(row["最终状态"])}</td>
+  </tr>`).join("");
+}
+function renderButtons() { document.querySelectorAll("button[data-status]").forEach(btn => btn.classList.toggle("active", btn.dataset.status === selectedStatus)); }
+function renderAll() { renderFilters(); renderCards(); renderVisuals(); renderSummary(); renderDetails(); renderButtons(); }
+function handleDimensionChange() {
+  selectedSite = siteFilter.value;
+  selectedStore = storeFilter.value;
+  selectedOwner = ownerFilter.value;
+  selectedKey = "";
+  renderAll();
+}
+siteFilter.addEventListener("change", handleDimensionChange);
+storeFilter.addEventListener("change", handleDimensionChange);
+ownerFilter.addEventListener("change", handleDimensionChange);
+clearFilter.addEventListener("click", () => { selectedKey = ""; selectedStatus = ""; selectedSite = ""; selectedStore = ""; selectedOwner = ""; searchBox.value = ""; renderAll(); });
+document.querySelectorAll("button[data-status]").forEach(btn => btn.addEventListener("click", () => { selectedStatus = selectedStatus === btn.dataset.status ? "" : btn.dataset.status; selectedKey = ""; renderAll(); }));
+searchBox.addEventListener("input", renderDetails);
+renderAll();
 </script>
 </body>
 </html>
-"@
+'@
 
-Set-Content -LiteralPath $DashboardPath -Value $Html -Encoding UTF8
-Copy-Item -LiteralPath $DashboardPath -Destination (Join-Path $OutDir "dashboard_powerbi.html") -Force
+$Dashboard = $Template.
+    Replace("__TOTAL__", [string]$Total).
+    Replace("__HIGH__", [string]$High).
+    Replace("__REVIEW__", [string]$Review).
+    Replace("__SITE_OPTIONS__", $SiteOptions).
+    Replace("__STORE_OPTIONS__", $StoreOptions).
+    Replace("__OWNER_OPTIONS__", $OwnerOptions).
+    Replace("__SUMMARY_JSON__", $SummaryJson).
+    Replace("__DETAILS_JSON__", $DetailsJson)
+
+Set-Content -LiteralPath $DashboardPath -Value $Dashboard -Encoding UTF8
+
 $FileUri = "file:///" + ($DashboardPath -replace "\\", "/" -replace " ", "%20")
-Set-Content -LiteralPath $ShortcutPath -Value "[InternetShortcut]`r`nURL=$FileUri" -Encoding ASCII
-$Manifest = [PSCustomObject]@{ generated_at=(Get-Date).ToString("yyyy-MM-dd HH:mm:ss"); style_name="powerbi-sales-dashboard-inspired-v1"; summary_rows=@($Summary).Count; detail_rows=@($Details).Count; total_anomaly_products=$Total; high_priority=$High; review_required=$Review; output_files=[PSCustomObject]@{ dashboard_html=$DashboardPath; shortcut=$ShortcutPath } }
+$Shortcut = "[InternetShortcut]`r`nURL=$FileUri"
+Set-Content -LiteralPath $ShortcutPath -Value $Shortcut -Encoding ASCII
+
+$Manifest = [PSCustomObject]@{
+    generated_at = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+    style_reference = "https://github.com/yashsdoshi/Sales_report_using_PowerBi"
+    style_name = "powerbi-sales-dashboard-inspired-v1"
+    summary_rows = @($Summary).Count
+    detail_rows = @($Details).Count
+    total_anomaly_products = $Total
+    high_priority = $High
+    review_required = $Review
+    owners = $OwnerCount
+    output_files = [PSCustomObject]@{
+        dashboard_html = $DashboardPath
+        shortcut = $ShortcutPath
+    }
+}
 $Manifest | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $ManifestPath -Encoding UTF8
 $Manifest | ConvertTo-Json -Depth 6
