@@ -1,0 +1,25 @@
+{
+  "template_repository_url": "https://github.com/defway888-design/kuajing-wulaoshi-weekly-analysis-template",
+  "template_manifest_path": "template_manifest.json",
+  "data_source_mcp_url": "https://openmcp.lingxing.com/mcp-servers/lingxing-mcp",
+  "data_source_mcp_key": "<runtime-secret-only>",
+  "output_dir": "<runtime-local-output-directory>",
+  "mode": "trial",
+  "sender_mailbox": {
+    "email": "<boss-provided-sender-email>",
+    "provider": "<auto-detected-provider>",
+    "credential_storage": "<runtime-secure-storage-reference>",
+    "test_email_status": "not_tested"
+  },
+  "management_recipient": {
+    "name": "<boss-name-or-remark>",
+    "email": "<boss-management-recipient-email>"
+  },
+  "owner_email_map_path": "<runtime-local-owner-email-map.csv>",
+  "automation": {
+    "enabled": false,
+    "start_rule": "Monday 00:00",
+    "standard_send_rule": "Monday 09:00",
+    "late_send_rule": "send after processing and validation succeed"
+  }
+}
