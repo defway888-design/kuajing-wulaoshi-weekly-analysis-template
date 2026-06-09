@@ -1,0 +1,39 @@
+{
+  "schema_version": "1.0.0",
+  "last_reviewed": "2026-05-31",
+  "providers": [
+    {
+      "id": "qq",
+      "domains": ["qq.com"],
+      "route": "authorization_code",
+      "official_entry_url": "https://mail.qq.com",
+      "smtp": {
+        "host": "smtp.qq.com",
+        "port": 465,
+        "security": "SSL"
+      }
+    },
+    {
+      "id": "netease_163",
+      "domains": ["163.com", "126.com", "yeah.net"],
+      "route": "authorization_code",
+      "official_entry_url": "https://mail.163.com"
+    },
+    {
+      "id": "microsoft",
+      "domains": ["outlook.com", "hotmail.com"],
+      "route": "official_authorization",
+      "official_entry_url": "https://outlook.live.com"
+    },
+    {
+      "id": "google",
+      "domains": ["gmail.com"],
+      "route": "official_authorization",
+      "official_entry_url": "https://mail.google.com"
+    }
+  ],
+  "fallback": {
+    "route": "provider_selection_or_implementation_assistance",
+    "custom_smtp": "technical_fallback_only"
+  }
+}
