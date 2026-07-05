@@ -305,6 +305,7 @@ Columns:
 上月值
 变化率
 历史判断
+待复核原因
 最终状态
 ```
 
@@ -324,6 +325,23 @@ The current purple PowerBI-style template is approved.
 Do not modify it unless the user explicitly asks to modify 异动明细BI.
 
 Owner-specific 异动明细BI must embed only that owner’s data. Do not send a full dashboard with a default owner filter.
+
+When generating the owner-facing operational 异动明细BI, include visible `待复核异动统计` and `待复核异动明细` modules, and include a `待复核原因` column in the detail table.
+
+The reason logic must be dynamic:
+
+```text
+known review reasons:
+- 从0新增
+- 低样本
+- 负责人变更
+- 无历史数据
+
+future review reasons:
+- derive the display label from 历史判断
+- do not hide or collapse unknown reasons
+- show the new reason text in 待复核异动统计, 待复核异动明细, and in the full detail table
+```
 
 ### 负责人BI
 
@@ -347,8 +365,10 @@ But do not add modules.
 7. 异动指标 by 类型
 8. 异动商品数 by 店铺
 9. 异动走势 by 负责人排序
-10. 负责人汇总表
-11. 异动明细表
+10. 待复核异动统计
+11. 待复核异动明细
+12. 负责人汇总表
+13. 异动明细表
 ```
 
 Forbidden in 负责人BI:

@@ -237,6 +237,7 @@ history explains movement -> exclude from output
 上月值
 变化率
 历史判断
+待复核原因
 最终状态
 ```
 
@@ -248,6 +249,24 @@ history explains movement -> exclude from output
 ```
 
 异动明细BI is frozen unless explicitly requested.
+
+The owner-facing operational 异动明细BI must show:
+
+```text
+待复核异动统计
+待复核异动明细
+```
+
+Known `待复核原因` labels:
+
+```text
+从0新增
+低样本
+负责人变更
+无历史数据
+```
+
+If future review reasons are added, the dashboard must display the new reason text dynamically from `历史判断` in both the review statistics and the review-detail table instead of hiding it under a generic bucket.
 
 负责人BI uses the `powerbi-full-panel-2026` visual direction but must keep the same module list and order as 异动明细BI.
 
