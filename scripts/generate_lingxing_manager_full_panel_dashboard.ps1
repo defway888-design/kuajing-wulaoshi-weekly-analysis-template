@@ -252,6 +252,9 @@ button.active {
 }
 .legend .high { background:var(--orange); }
 .legend .review { background:var(--amber); }
+.legend .traffic { background:var(--orange); }
+.legend .cvr { background:var(--amber); }
+.legend .both { background:var(--blue); }
 .line-chart {
   height:222px;
   position:relative;
@@ -486,7 +489,26 @@ function renderDonut(el, legend, high, review, labels = ["高优先级异动", "
   const total = Math.max(0, high + review);
   const deg = total ? (high / total * 360) : 0;
   el.style.setProperty("--high-deg", `${deg}deg`);
+  el.style.removeProperty("background");
   legend.innerHTML = `<div><span class="high"></span>${esc(labels[0])}：${high}</div><div><span class="review"></span>${esc(labels[1])}：${review}</div><div>合计：${total}</div>`;
+}
+function renderMetricCategoryDonut(el, legend, items) {
+  const colors = ["var(--orange)", "var(--amber)", "var(--blue)"];
+  const classes = ["traffic", "cvr", "both"];
+  const total = items.reduce((sum, item) => sum + item.value, 0);
+  if (!total) {
+    el.style.background = "conic-gradient(#e5ebf3 0deg,#e5ebf3 360deg)";
+  } else {
+    let start = 0;
+    const segments = items.map((item, index) => {
+      const end = start + (item.value / total * 360);
+      const segment = `${colors[index]} ${start}deg ${end}deg`;
+      start = end;
+      return segment;
+    });
+    el.style.background = `conic-gradient(${segments.join(",")})`;
+  }
+  legend.innerHTML = items.map((item, index) => `<div><span class="${classes[index]}"></span>${esc(item.label)}：${item.value}</div>`).join("") + `<div>合计：${total}</div>`;
 }
 function renderLine(rows) {
   const list = rows.slice(0, 10);
@@ -516,9 +538,11 @@ function renderVisuals() {
   renderBars(storeBars, aggregate(rows, "店铺"), "total");
   renderDonut(typeDonut, typeLegend, high, review);
   const metricRows = filteredDetails();
-  const traffic = metricRows.filter(row => String(row["异动指标"]).includes("流量")).length;
-  const cvr = metricRows.filter(row => String(row["异动指标"]).includes("转化率")).length;
-  renderDonut(metricDonut, metricLegend, traffic, cvr, ["流量异动", "转化率异动"]);
+  renderMetricCategoryDonut(metricDonut, metricLegend, [
+    { label:"流量异动", value:metricRows.filter(row => String(row["异动指标"]).trim() === "流量异动").length },
+    { label:"转化率异动", value:metricRows.filter(row => String(row["异动指标"]).trim() === "转化率异动").length },
+    { label:"流量+转化率异动", value:metricRows.filter(row => String(row["异动指标"]).trim() === "流量+转化率异动").length }
+  ]);
   renderLine(aggregate(rows, "负责人"));
 }
 function renderSummary() {

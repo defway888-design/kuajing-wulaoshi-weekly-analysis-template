@@ -226,9 +226,10 @@ select option { color:#111827; background:#ffffff; }
 .bar-track { height:22px; background:rgba(255,255,255,.12); border-left:1px dotted rgba(255,255,255,.7); border-right:1px dotted rgba(255,255,255,.45); }
 .bar-fill { height:100%; background:var(--blue); }
 .reason-list { display:grid; gap:8px; padding:8px 2px 0; }
-.reason-row { display:grid; grid-template-columns:1fr 46px; gap:10px; align-items:center; padding:8px 10px; border:1px solid rgba(255,255,255,.24); border-radius:8px; background:rgba(255,255,255,.10); font-size:12px; font-weight:700; }
+.reason-row { display:grid; grid-template-columns:1fr 46px; gap:10px; align-items:center; padding:8px 10px; border:1px solid rgba(255,255,255,.24); border-radius:8px; background:rgba(255,255,255,.10); font-size:12px; font-weight:700; cursor:pointer; }
+.reason-row.active { background:rgba(255,241,168,.24); border-color:#fff1a8; box-shadow:inset 0 0 0 1px rgba(255,255,255,.22); }
 .reason-row .label { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.reason-row .count { text-align:right; color:#fff1a8; font-weight:900; font-variant-numeric:tabular-nums; }
+.reason-row .count { text-align:right; color:#fff1a8; font-weight:900; font-variant-numeric:tabular-nums; text-decoration:underline; text-underline-offset:2px; }
 .donut-wrap { display:grid; grid-template-columns:190px 1fr; align-items:center; min-height:214px; gap:10px; }
 .donut {
   width:166px;
@@ -249,6 +250,9 @@ select option { color:#111827; background:#ffffff; }
 .legend span { display:inline-flex; width:12px; height:12px; margin-right:7px; vertical-align:middle; }
 .legend .high { background:var(--high); }
 .legend .review { background:var(--review); }
+.legend .traffic { background:var(--high); }
+.legend .cvr { background:var(--review); }
+.legend .both { background:var(--blue); }
 .line-chart {
   height:222px;
   position:relative;
@@ -352,6 +356,7 @@ let selectedStatus = "";
 let selectedSite = "";
 let selectedStore = "";
 let selectedOwner = "";
+let selectedReviewReason = "";
 const siteFilter = document.getElementById("siteFilter");
 const storeFilter = document.getElementById("storeFilter");
 const ownerFilter = document.getElementById("ownerFilter");
@@ -407,6 +412,9 @@ function filteredDetails() {
   });
 }
 function filteredReviewDetails() {
+  return filteredReviewBaseDetails().filter(row => !selectedReviewReason || reviewReason(row) === selectedReviewReason);
+}
+function filteredReviewBaseDetails() {
   const q = document.querySelector("#searchBox").value.trim().toLowerCase();
   return details.filter(row => {
     if (row["最终状态"] !== "待复核异动") return false;
@@ -464,13 +472,38 @@ function aggregateReviewReasons(rows) {
 }
 function renderReviewReasons(el, rows, limit = 8) {
   const list = aggregateReviewReasons(rows).slice(0, limit);
-  el.innerHTML = list.length ? list.map(row => `<div class="reason-row" title="${esc(row.label)}"><div class="label">${esc(row.label)}</div><div class="count">${row.total}</div></div>`).join("") : `<div>无待复核异动</div>`;
+  if (selectedReviewReason && !list.some(row => row.label === selectedReviewReason)) selectedReviewReason = "";
+  el.innerHTML = list.length ? list.map(row => `<div class="reason-row${row.label === selectedReviewReason ? " active" : ""}" data-reason="${esc(row.label)}" title="${esc(row.label)}"><div class="label">${esc(row.label)}</div><div class="count">${row.total}</div></div>`).join("") : `<div>无待复核异动</div>`;
+  el.querySelectorAll(".reason-row").forEach(row => row.addEventListener("click", () => {
+    selectedReviewReason = selectedReviewReason === row.dataset.reason ? "" : row.dataset.reason;
+    renderVisuals();
+    renderReviewDetails();
+  }));
 }
 function renderDonut(el, legend, high, review, labels = ["高优先级异动", "待复核异动"]) {
   const total = Math.max(0, high + review);
   const deg = total ? (high / total * 360) : 0;
   el.style.setProperty("--high-deg", `${deg}deg`);
+  el.style.removeProperty("background");
   legend.innerHTML = `<div><span class="high"></span>${esc(labels[0])}：${high}</div><div><span class="review"></span>${esc(labels[1])}：${review}</div><div>合计：${total}</div>`;
+}
+function renderMetricCategoryDonut(el, legend, items) {
+  const colors = ["var(--high)", "var(--review)", "var(--blue)"];
+  const classes = ["traffic", "cvr", "both"];
+  const total = items.reduce((sum, item) => sum + item.value, 0);
+  if (!total) {
+    el.style.background = "conic-gradient(rgba(255,255,255,.16) 0deg, rgba(255,255,255,.16) 360deg)";
+  } else {
+    let start = 0;
+    const segments = items.map((item, index) => {
+      const end = start + (item.value / total * 360);
+      const segment = `${colors[index]} ${start}deg ${end}deg`;
+      start = end;
+      return segment;
+    });
+    el.style.background = `conic-gradient(${segments.join(",")})`;
+  }
+  legend.innerHTML = items.map((item, index) => `<div><span class="${classes[index]}"></span>${esc(item.label)}：${item.value}</div>`).join("") + `<div>合计：${total}</div>`;
 }
 function renderLine(rows) {
   const list = rows.slice(0, 10);
@@ -500,10 +533,12 @@ function renderVisuals() {
   renderBars(storeBars, aggregate(rows, "店铺"), "total");
   renderDonut(typeDonut, typeLegend, high, review);
   const metricRows = filteredDetails();
-  const reviewRows = filteredReviewDetails();
-  const traffic = metricRows.filter(row => String(row["异动指标"]).includes("流量")).length;
-  const cvr = metricRows.filter(row => String(row["异动指标"]).includes("转化率")).length;
-  renderDonut(metricDonut, metricLegend, traffic, cvr, ["流量异动", "转化率异动"]);
+  const reviewRows = filteredReviewBaseDetails();
+  renderMetricCategoryDonut(metricDonut, metricLegend, [
+    { label:"流量异动", value:metricRows.filter(row => String(row["异动指标"]).trim() === "流量异动").length },
+    { label:"转化率异动", value:metricRows.filter(row => String(row["异动指标"]).trim() === "转化率异动").length },
+    { label:"流量+转化率异动", value:metricRows.filter(row => String(row["异动指标"]).trim() === "流量+转化率异动").length }
+  ]);
   renderReviewReasons(reviewReasonBars, reviewRows);
   renderLine(aggregate(rows, "负责人"));
 }
@@ -536,7 +571,8 @@ function renderDetails() {
 }
 function renderReviewDetails() {
   const rows = filteredReviewDetails();
-  reviewDetailTitle.textContent = selectedKey ? `${selectedKey.replaceAll("||", " / ")}：${rows.length} 条待复核` : `待复核异动明细：${rows.length} 条`;
+  const reasonText = selectedReviewReason ? ` / ${selectedReviewReason}` : "";
+  reviewDetailTitle.textContent = selectedKey ? `${selectedKey.replaceAll("||", " / ")}${reasonText}：${rows.length} 条待复核` : `待复核异动明细${reasonText}：${rows.length} 条`;
   reviewDetailTable.querySelector("tbody").innerHTML = rows.map(row => `<tr>
     <td>${esc(row["父ASIN"])}</td><td>${esc(row["商品名"])}</td><td>${esc(row["异动指标"])}</td>
     <td>${esc(row["变化率"])}</td><td>${esc(reviewReason(row))}</td><td>${esc(row["历史判断"])}</td>
@@ -554,7 +590,7 @@ function handleDimensionChange() {
 siteFilter.addEventListener("change", handleDimensionChange);
 storeFilter.addEventListener("change", handleDimensionChange);
 ownerFilter.addEventListener("change", handleDimensionChange);
-clearFilter.addEventListener("click", () => { selectedKey = ""; selectedStatus = ""; selectedSite = ""; selectedStore = ""; selectedOwner = ""; searchBox.value = ""; renderAll(); });
+clearFilter.addEventListener("click", () => { selectedKey = ""; selectedStatus = ""; selectedSite = ""; selectedStore = ""; selectedOwner = ""; selectedReviewReason = ""; searchBox.value = ""; renderAll(); });
 document.querySelectorAll("button[data-status]").forEach(btn => btn.addEventListener("click", () => { selectedStatus = selectedStatus === btn.dataset.status ? "" : btn.dataset.status; selectedKey = ""; renderAll(); }));
 searchBox.addEventListener("input", () => { renderVisuals(); renderDetails(); renderReviewDetails(); });
 renderAll();
