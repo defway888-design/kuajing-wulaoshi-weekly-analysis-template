@@ -65,9 +65,25 @@ send_test_email
 This mailbox receives:
 
 ```text
-负责人汇总表
-负责人BI
-full-scope output
+老板汇总包
+```
+
+Boss package rules:
+
+```text
+default: send one complete zip package
+complete package includes 负责人BI, 负责人汇总表, 异动明细表, 高优先级ASIN诊断报告索引.csv, ASIN diagnosis summary pages, and full Word diagnosis reports
+if complete package exceeds the usable sender-provider threshold: send one light package instead
+light package includes 负责人BI, 负责人汇总表, 异动明细表, 高优先级ASIN诊断报告索引.csv, and ASIN diagnosis summary pages only
+do not split the boss package into multi-volume archives
+```
+
+Boss BI links:
+
+```text
+use relative paths inside the zip package
+open ASIN diagnosis summary pages
+do not depend on absolute local paths or cloud storage
 ```
 
 Do not maintain other management recipients, CC lists, or forwarding rules in the workflow. If other management users need the report, the boss configures forwarding in their own mailbox.
@@ -77,9 +93,26 @@ Owners receive:
 ```text
 their own 异动明细表
 their own 异动明细BI
+their own high-priority ASIN Word diagnosis reports
 ```
 
 Never send full-scope HTML to an owner with only a default filter applied. Owner-specific HTML must embed only that owner’s data.
+
+Owner attachment rules:
+
+```text
+few Word reports and under threshold -> send as individual attachments
+too many Word reports or over threshold -> compress that owner's diagnosis reports into one zip
+if owner package still exceeds threshold -> send owner BI/detail data and mark diagnosis attachment as manual follow-up required
+```
+
+High-priority diagnosis failures:
+
+```text
+include the ASIN and failure status in the owner email body
+do not fabricate a Word report
+keep the diagnosis index row for audit
+```
 
 ## Owner Email Source
 
@@ -154,6 +187,7 @@ Prompt should show:
 异动商品数
 高优先级异动
 待复核异动
+高优先级诊断报告数
 ```
 
 Accepted inputs:
@@ -175,6 +209,10 @@ boss management email
 owner -> email mapping
 missing owners
 attachments to be sent
+boss package type: complete | light
+boss package size and usable threshold
+owner diagnosis attachments or owner diagnosis zip
+diagnosis failures needing manual review
 ```
 
 Require:
@@ -200,6 +238,7 @@ Generate:
 ```text
 email_send_log.csv
 unmatched_owner_email_report.csv
+package_manifest.json
 ```
 
 Never log MCP keys or email passwords.

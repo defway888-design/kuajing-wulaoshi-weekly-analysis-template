@@ -1,6 +1,6 @@
 ---
 name: kuajing-wulaoshi-weekly-analysis
-description: Build and operate the 跨境吴老师周数据分析 workflow for weekly parent-ASIN anomaly review. Use when Codex needs to calculate traffic or conversion anomalies, generate 负责人BI and 异动明细BI outputs, split owner-only dashboards, guide sender mailbox setup, configure weekly email delivery, or maintain the fixed rules, schemas, templates, and permissions for this branded workflow.
+description: Build and operate the 跨境吴老师周数据分析 workflow for weekly parent-ASIN anomaly review. Use when Codex needs to calculate traffic or conversion anomalies, run high-priority ASIN diagnosis routing, generate Word diagnosis reports, generate 负责人BI and 异动明细BI outputs, split owner-only dashboards, package boss/owner email attachments, guide sender mailbox setup, configure weekly email delivery, or maintain the fixed rules, schemas, templates, and permissions for this branded workflow.
 ---
 
 # 跨境吴老师周数据分析Skill
@@ -36,9 +36,13 @@ Default progress messages:
 跨境吴老师正在检查业务模板版本...
 跨境吴老师正在获取业务数据...
 跨境吴老师正在分析父商品流量与转化率异动...
+跨境吴老师正在识别高优先级ASIN...
+跨境吴老师正在生成高优先级ASIN诊断报告...
 跨境吴老师正在生成负责人汇总表...
 跨境吴老师正在生成负责人BI...
 跨境吴老师正在生成异动明细BI...
+跨境吴老师正在准备老板汇总包...
+跨境吴老师正在准备负责人专属附件...
 跨境吴老师正在检查负责人邮箱...
 跨境吴老师正在准备邮件发送...
 跨境吴老师周数据分析已完成。
@@ -257,6 +261,95 @@ If no historical comparable data exists:
 
 Never use rolling 4-week/8-week or category fallback in the current standard.
 
+## High-Priority ASIN Deep Diagnosis
+
+Only deep-diagnose rows where:
+
+```text
+最终状态 = 高优先级异动
+```
+
+Dispatch strictly by `异动指标`:
+
+```text
+流量异动 -> call 跨境吴老师流量异动数据分析Skill only
+转化率异动 -> call 跨境吴老师转化率异动数据分析Skill only
+流量+转化率异动 -> call both Skills and produce one combined report
+```
+
+Do not call both diagnosis Skills for every high-priority ASIN. The diagnosis Skills consume substantial compute, so the trigger must match the anomaly type.
+
+Diagnosis Skill repositories:
+
+```text
+traffic: https://github.com/defway888-design/kuajing-wulaoshi-amazon-traffic-anomaly-skil
+conversion: https://github.com/defway888-design/kuajing-wulaoshi-amazon-conversion-anomaly-skill
+```
+
+Output one standalone Word report per high-priority ASIN:
+
+```text
+diagnosis_reports/{reporting_period}/{site}_{store}_{owner}_{parent_asin}_{metric_type}.docx
+```
+
+Create a diagnosis index:
+
+```text
+高优先级ASIN诊断报告索引.csv
+```
+
+Required index columns:
+
+```text
+站点
+店铺
+负责人
+父ASIN
+商品名
+异动指标
+诊断状态
+报告类型
+摘要页地址
+Word报告地址
+失败原因
+```
+
+Allowed `诊断状态` values:
+
+```text
+已完成
+部分完成
+诊断失败
+未生成
+```
+
+If a diagnosis Skill call fails:
+
+```text
+record 诊断失败 or 部分完成
+write the failure reason into 高优先级ASIN诊断报告索引.csv
+do not fabricate a Word report
+show the failed ASIN in BI with the failure status
+include a manual-review note in the owner email
+```
+
+If multiple owners share one ASIN:
+
+```text
+generate the ASIN diagnosis once
+reuse the same report in every current owner's package
+send to all current mapped owners
+```
+
+If owner is empty or `未分配`:
+
+```text
+do not send an owner-specific email
+show it in 负责人BI
+route handling to the boss management package
+mark recipient role as manager_proxy
+```
+
 ## Fixed Output Tables
 
 ### 负责人汇总表
@@ -328,6 +421,18 @@ Owner-specific 异动明细BI must embed only that owner’s data. Do not send a
 
 When generating the owner-facing operational 异动明细BI, include visible `待复核异动统计` and `待复核异动明细` modules, and include a `待复核原因` column in the detail table.
 
+Also include `高优先级ASIN诊断报告入口` above `待复核异动统计` and `待复核异动明细`.
+
+The operational 异动明细BI must not display the old `负责人汇总与异动明细` module.
+
+The BI must not display this text:
+
+```text
+BI只展示入口，报告独立打开
+```
+
+Long diagnosis text is never placed directly inside the BI. The BI shows high-priority ASIN entries and opens the independent diagnosis summary/report path when the user clicks `查看报告`.
+
 The reason logic must be dynamic:
 
 ```text
@@ -365,10 +470,11 @@ But do not add modules.
 7. 异动指标 by 类型
 8. 异动商品数 by 店铺
 9. 异动走势 by 负责人排序
-10. 待复核异动统计
-11. 待复核异动明细
-12. 负责人汇总表
-13. 异动明细表
+10. 高优先级ASIN诊断报告入口
+11. 待复核异动统计
+12. 待复核异动明细
+13. 负责人汇总表
+14. 异动明细表
 ```
 
 Forbidden in 负责人BI:
@@ -411,10 +517,20 @@ send test email: yes/no
 This management mailbox receives:
 
 ```text
-负责人汇总表
-负责人BI
-full-scope summary data
+老板汇总包
 ```
+
+Boss package rules:
+
+```text
+default: send one complete zip package
+package name pattern: {reporting_period}_运营数据汇总.zip
+complete package includes 负责人BI, summary/detail tables, diagnosis index, ASIN diagnosis summary pages, and full Word diagnosis reports
+if complete package exceeds the usable sender attachment threshold, automatically send a light summary package
+light package includes 负责人BI, summary/detail tables, diagnosis index, and ASIN diagnosis summary pages only
+```
+
+Boss BI links must be relative paths inside the zip package. The boss should download and unzip the package first, then open the BI. In the light package, BI report links open the ASIN diagnosis summary page, not the full Word report.
 
 Do not maintain extra management recipients, CC rules, or management forwarding rules in the workflow. If other managers need the report, the boss handles forwarding in their own mailbox.
 
@@ -423,9 +539,28 @@ Each owner receives:
 ```text
 that owner’s 异动明细表
 that owner’s 异动明细BI
+that owner’s high-priority ASIN Word diagnosis reports
 ```
 
 Owner dashboards must not contain other owners’ data.
+
+Owner attachment rules:
+
+```text
+few reports and under threshold -> attach Word reports one by one
+too many reports or over threshold -> compress that owner’s Word reports into one zip
+if the owner package still exceeds threshold -> send the owner BI/detail data plus a manual follow-up note
+```
+
+Attachment size threshold:
+
+```text
+detect sender provider during setup
+verify the current official attachment rule for that provider
+usable threshold = official max attachment size * configured safety ratio
+default safety ratio = 0.70
+unknown provider -> require manual threshold confirmation before automatic formal sending
+```
 
 ## Sender Mailbox Setup Routing
 
@@ -497,6 +632,11 @@ each summary row: 异动商品数 = 高优先级异动 + 待复核异动
 异动明细BI was not modified unless explicitly requested
 owner-specific HTML contains no other owner data
 dropdowns contain site/store/owner options
+if 高优先级异动 > 0 in formal-send mode, 高优先级ASIN诊断报告索引.csv exists
+diagnosis index rows match high-priority ASIN scope
+BI report links use relative package paths, not absolute local paths
+老板完整包 or 老板轻量包 is selected by provider attachment threshold
+owner emails include only that owner’s data and allowed diagnosis attachments
 ```
 
 ## Packaged Resources
@@ -537,4 +677,5 @@ Read these only when needed:
 - `references/business-spec.md`: full business specification.
 - `references/email-flow.md`: email distribution and owner email entry flow.
 - `references/email-provider-routing.md`: sender mailbox provider detection and guided setup.
+- `references/high-priority-diagnosis-flow.md`: high-priority ASIN diagnosis, Word reports, BI links, and package rules.
 - `references/online-template-distribution.md`: multi-user online template distribution model.

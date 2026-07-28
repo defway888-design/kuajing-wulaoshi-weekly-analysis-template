@@ -125,6 +125,32 @@ record test result and timestamp
 enable formal weekly delivery only after test succeeds
 ```
 
+Also determine the attachment threshold used for boss and owner packages:
+
+```text
+detect sender provider
+verify the provider's current official attachment-size rule
+record official max size, source, and review date in runtime config
+usable threshold = official max size * safety ratio
+default safety ratio = 0.70
+```
+
+Use the usable threshold, not the official max size, when deciding:
+
+```text
+boss complete package vs boss light package
+owner individual Word attachments vs owner diagnosis-report zip
+manual follow-up when package remains too large
+```
+
+If the current official threshold cannot be confirmed:
+
+```text
+keep automatic formal sending disabled
+ask for manual threshold confirmation or implementation assistance
+allow trial analysis and BI generation to continue
+```
+
 If the test fails:
 
 ```text

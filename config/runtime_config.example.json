@@ -15,6 +15,27 @@
     "name": "<boss-name-or-remark>",
     "email": "<boss-management-recipient-email>"
   },
+  "high_priority_diagnosis": {
+    "enabled_for_status": "高优先级异动",
+    "traffic_skill_repository": "https://github.com/defway888-design/kuajing-wulaoshi-amazon-traffic-anomaly-skil",
+    "conversion_skill_repository": "https://github.com/defway888-design/kuajing-wulaoshi-amazon-conversion-anomaly-skill",
+    "report_format": "docx",
+    "report_output_dir": "<runtime-local-output-directory>/diagnosis_reports/<reporting_period>",
+    "diagnosis_index_path": "<runtime-local-output-directory>/高优先级ASIN诊断报告索引.csv",
+    "dispatch_rule": {
+      "流量异动": "traffic_only",
+      "转化率异动": "conversion_only",
+      "流量+转化率异动": "traffic_and_conversion_combined"
+    }
+  },
+  "email_packaging": {
+    "attachment_threshold_source": "sender_provider_current_official_rule",
+    "attachment_safety_ratio": 0.7,
+    "boss_default_package": "complete_zip",
+    "boss_oversize_package": "light_zip",
+    "owner_small_report_mode": "individual_docx_attachments",
+    "owner_many_report_mode": "owner_diagnosis_zip"
+  },
   "owner_email_map_path": "<runtime-local-owner-email-map.csv>",
   "automation": {
     "enabled": false,

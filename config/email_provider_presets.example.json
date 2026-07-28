@@ -1,12 +1,19 @@
 {
   "schema_version": "1.0.0",
   "last_reviewed": "2026-05-31",
+  "attachment_policy": {
+    "official_limit_source": "verify_current_official_provider_rule_at_setup",
+    "default_safety_ratio": 0.7,
+    "unknown_provider_action": "manual_threshold_confirmation_required_before_formal_sending"
+  },
   "providers": [
     {
       "id": "qq",
       "domains": ["qq.com"],
       "route": "authorization_code",
       "official_entry_url": "https://mail.qq.com",
+      "attachment_limit_mb": null,
+      "attachment_limit_last_reviewed": null,
       "smtp": {
         "host": "smtp.qq.com",
         "port": 465,
@@ -17,19 +24,25 @@
       "id": "netease_163",
       "domains": ["163.com", "126.com", "yeah.net"],
       "route": "authorization_code",
-      "official_entry_url": "https://mail.163.com"
+      "official_entry_url": "https://mail.163.com",
+      "attachment_limit_mb": null,
+      "attachment_limit_last_reviewed": null
     },
     {
       "id": "microsoft",
       "domains": ["outlook.com", "hotmail.com"],
       "route": "official_authorization",
-      "official_entry_url": "https://outlook.live.com"
+      "official_entry_url": "https://outlook.live.com",
+      "attachment_limit_mb": null,
+      "attachment_limit_last_reviewed": null
     },
     {
       "id": "google",
       "domains": ["gmail.com"],
       "route": "official_authorization",
-      "official_entry_url": "https://mail.google.com"
+      "official_entry_url": "https://mail.google.com",
+      "attachment_limit_mb": null,
+      "attachment_limit_last_reviewed": null
     }
   ],
   "fallback": {

@@ -211,6 +211,66 @@ no historical comparable data -> 待复核异动
 history explains movement -> exclude from output
 ```
 
+## High-Priority ASIN Diagnosis
+
+Only rows with:
+
+```text
+最终状态 = 高优先级异动
+```
+
+enter deep diagnosis.
+
+Dispatch by `异动指标`:
+
+```text
+流量异动 -> call only the traffic anomaly diagnosis Skill
+转化率异动 -> call only the conversion anomaly diagnosis Skill
+流量+转化率异动 -> call both Skills and merge into one combined ASIN report
+```
+
+Do not call both diagnosis Skills for every high-priority ASIN.
+
+Diagnosis Skill repositories:
+
+```text
+traffic: https://github.com/defway888-design/kuajing-wulaoshi-amazon-traffic-anomaly-skil
+conversion: https://github.com/defway888-design/kuajing-wulaoshi-amazon-conversion-anomaly-skill
+```
+
+Generate one Word report per high-priority ASIN and maintain:
+
+```text
+高优先级ASIN诊断报告索引.csv
+```
+
+Required diagnosis index columns:
+
+```text
+站点
+店铺
+负责人
+父ASIN
+商品名
+异动指标
+诊断状态
+报告类型
+摘要页地址
+Word报告地址
+失败原因
+```
+
+Allowed `诊断状态` values:
+
+```text
+已完成
+部分完成
+诊断失败
+未生成
+```
+
+If diagnosis fails, keep the ASIN in the index with failure status and reason. Do not fabricate report content.
+
 ## Output Tables
 
 负责人汇总表 columns:
@@ -253,9 +313,22 @@ history explains movement -> exclude from output
 The owner-facing operational 异动明细BI must show:
 
 ```text
+高优先级ASIN诊断报告入口
 待复核异动统计
 待复核异动明细
 ```
+
+`高优先级ASIN诊断报告入口` must be placed above `待复核异动统计` and `待复核异动明细`.
+
+Owner-facing operational 异动明细BI must not display `负责人汇总与异动明细`.
+
+Both boss and owner dashboards must not display:
+
+```text
+BI只展示入口，报告独立打开
+```
+
+Diagnosis reports are standalone Word reports. BI dashboards show only compact high-priority ASIN entries and `查看报告` links.
 
 Known `待复核原因` labels:
 
@@ -293,9 +366,20 @@ Management recipient:
 
 ```text
 single boss management email only
-receives 负责人汇总表 and 负责人BI
+receives one boss package by default
 other management forwarding is handled by the boss in their mailbox
 ```
+
+Boss package:
+
+```text
+default: one complete zip package
+complete package: 负责人BI + summary/detail tables + diagnosis index + ASIN summary pages + Word reports
+if the complete package exceeds the sender-provider usable threshold: send a light package
+light package: 负责人BI + summary/detail tables + diagnosis index + ASIN summary pages, without full Word reports
+```
+
+Boss BI report links must use relative paths inside the zip package and open ASIN diagnosis summary pages.
 
 Owner recipients:
 
@@ -303,6 +387,15 @@ Owner recipients:
 detected from current LingXing owner data
 missing owner emails are prompted during the Codex run
 each owner receives only their own 异动明细表 and 异动明细BI
+each owner also receives their own high-priority ASIN Word diagnosis reports
+```
+
+Owner diagnosis attachments:
+
+```text
+few reports and under threshold -> send Word reports as individual attachments
+many reports or over threshold -> send one owner diagnosis-report zip
+if the owner package still exceeds threshold -> send BI/detail data and mark diagnosis attachment as manual follow-up required
 ```
 
 ## Sender Mailbox Guided Setup

@@ -18,6 +18,7 @@ New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 
 $SummaryPath = Join-Path $OutDir "负责人汇总表_优先级命名.csv"
 $DetailPath = Join-Path $OutDir "异动明细表_优先级命名.csv"
+$DiagnosisIndexPath = Join-Path $OutDir "高优先级ASIN诊断报告索引.csv"
 if (-not (Test-Path -LiteralPath $SummaryPath)) { throw "缺少负责人汇总表：$SummaryPath" }
 if (-not (Test-Path -LiteralPath $DetailPath)) { throw "缺少异动明细表：$DetailPath" }
 
@@ -26,11 +27,65 @@ function HtmlEscape([string]$Value) {
     return $Value.Replace("&", "&amp;").Replace("<", "&lt;").Replace(">", "&gt;").Replace('"', "&quot;")
 }
 
+function Get-FieldValue($Row, [string[]]$Names) {
+    foreach ($Name in $Names) {
+        $Property = $Row.PSObject.Properties[$Name]
+        if ($null -ne $Property -and $null -ne $Property.Value) {
+            return [string]$Property.Value
+        }
+    }
+    return ""
+}
+
+function Get-DiagnosisReportType([string]$MetricType) {
+    switch ($MetricType) {
+        "流量异动" { return "流量诊断" }
+        "转化率异动" { return "转化率诊断" }
+        "流量+转化率异动" { return "流量+转化率综合诊断" }
+        default { return "待确认诊断类型" }
+    }
+}
+
 $Summary = Import-Csv -LiteralPath $SummaryPath
 $Details = Import-Csv -LiteralPath $DetailPath
 
+if (Test-Path -LiteralPath $DiagnosisIndexPath) {
+    $DiagnosisRows = @(Import-Csv -LiteralPath $DiagnosisIndexPath | ForEach-Object {
+        [PSCustomObject]@{
+            "站点" = Get-FieldValue $_ @("站点", "site")
+            "店铺" = Get-FieldValue $_ @("店铺", "store")
+            "负责人" = Get-FieldValue $_ @("负责人", "owner", "owner_name")
+            "父ASIN" = Get-FieldValue $_ @("父ASIN", "parent_asin", "asin")
+            "商品名" = Get-FieldValue $_ @("商品名", "product_name")
+            "异动指标" = Get-FieldValue $_ @("异动指标", "metric_type")
+            "诊断状态" = Get-FieldValue $_ @("诊断状态", "diagnosis_status")
+            "报告类型" = Get-FieldValue $_ @("报告类型", "report_type")
+            "摘要页地址" = Get-FieldValue $_ @("摘要页地址", "summary_page_path", "summary_url", "报告地址")
+            "Word报告地址" = Get-FieldValue $_ @("Word报告地址", "word_report_path", "docx_path")
+            "失败原因" = Get-FieldValue $_ @("失败原因", "failure_reason")
+        }
+    })
+} else {
+    $DiagnosisRows = @($Details | Where-Object { $_.'最终状态' -eq "高优先级异动" } | ForEach-Object {
+        [PSCustomObject]@{
+            "站点" = $_.'站点'
+            "店铺" = $_.'店铺'
+            "负责人" = $_.'负责人'
+            "父ASIN" = $_.'父ASIN'
+            "商品名" = $_.'商品名'
+            "异动指标" = $_.'异动指标'
+            "诊断状态" = "未生成"
+            "报告类型" = Get-DiagnosisReportType $_.'异动指标'
+            "摘要页地址" = ""
+            "Word报告地址" = ""
+            "失败原因" = ""
+        }
+    })
+}
+
 $SummaryJson = ($Summary | ConvertTo-Json -Depth 8 -Compress).Replace("<", "\u003c")
 $DetailsJson = ($Details | ConvertTo-Json -Depth 8 -Compress).Replace("<", "\u003c")
+$DiagnosisJson = (ConvertTo-Json -InputObject @($DiagnosisRows) -Depth 8 -Compress).Replace("<", "\u003c")
 
 $Total = ($Summary | Measure-Object -Property "异动商品数" -Sum).Sum
 $High = ($Summary | Measure-Object -Property "高优先级异动" -Sum).Sum
@@ -214,6 +269,41 @@ button.active {
   border-radius:999px;
   background:linear-gradient(90deg,var(--blue),var(--cyan));
 }
+.report-panel { grid-column:1 / -1; min-height:188px; }
+.report-list {
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0,1fr));
+  gap:10px;
+  max-height:292px;
+  overflow:auto;
+}
+.report-card {
+  min-height:96px;
+  display:grid;
+  gap:6px;
+  align-content:start;
+  padding:12px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:var(--panel-soft);
+}
+.report-card .asin { font-size:15px; font-weight:900; color:var(--orange); }
+.report-card .meta { font-size:12px; line-height:1.4; color:var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.report-card a, .report-card .pending {
+  width:max-content;
+  min-height:28px;
+  display:inline-flex;
+  align-items:center;
+  padding:0 10px;
+  border-radius:8px;
+  font-size:12px;
+  font-weight:900;
+  color:#fff;
+  background:var(--blue);
+  text-decoration:none;
+}
+.report-card .pending { color:var(--muted); background:#e9eef5; }
+.empty-note { padding:12px; color:var(--muted); font-weight:800; }
 .donut-wrap {
   display:grid;
   grid-template-columns:180px 1fr;
@@ -355,6 +445,7 @@ tr:hover, tr.selected { background:#eff6ff; }
   .top-grid, .visual-grid, .lower-grid { grid-template-columns:1fr; }
   .slicer-card { grid-template-columns:1fr; }
   .title-card h1 { font-size:26px; }
+  .report-list { grid-template-columns:1fr; }
   .donut-wrap { grid-template-columns:1fr; }
 }
 </style>
@@ -383,6 +474,11 @@ tr:hover, tr.selected { background:#eff6ff; }
     <div class="panel"><h2>异动指标 by 类型</h2><div class="donut-wrap"><div class="donut" id="metricDonut"></div><div class="legend" id="metricLegend"></div></div></div>
     <div class="panel"><h2>异动商品数 by 店铺</h2><div class="bar-chart" id="storeBars"></div></div>
     <div class="panel"><h2>异动走势 by 负责人排序</h2><div class="line-chart" id="ownerLine"></div></div>
+    <div class="panel report-panel">
+      <h2>高优先级ASIN诊断报告入口</h2>
+      <div class="detail-title" id="diagnosisTitle">当前高优先级ASIN诊断报告</div>
+      <div class="report-list" id="diagnosisList"></div>
+    </div>
     <div class="panel table-panel">
       <h2>负责人汇总与异动明细</h2>
       <div class="table-tools">
@@ -403,6 +499,7 @@ tr:hover, tr.selected { background:#eff6ff; }
 <script>
 const summary = __SUMMARY_JSON__;
 const details = __DETAILS_JSON__;
+const diagnosisReports = __DIAGNOSIS_JSON__;
 let selectedKey = "";
 let selectedStatus = "";
 let selectedSite = "";
@@ -421,6 +518,8 @@ const typeDonut = document.getElementById("typeDonut");
 const typeLegend = document.getElementById("typeLegend");
 const metricDonut = document.getElementById("metricDonut");
 const metricLegend = document.getElementById("metricLegend");
+const diagnosisTitle = document.getElementById("diagnosisTitle");
+const diagnosisList = document.getElementById("diagnosisList");
 const ownerLine = document.getElementById("ownerLine");
 const summaryTable = document.getElementById("summaryTable");
 const detailTitle = document.getElementById("detailTitle");
@@ -445,6 +544,17 @@ function filteredDetails() {
     if (selectedStatus && row["最终状态"] !== selectedStatus) return false;
     if (!q) return true;
     return String(row["父ASIN"]).toLowerCase().includes(q) || String(row["商品名"]).toLowerCase().includes(q);
+  });
+}
+function filteredDiagnosisReports() {
+  const q = searchBox.value.trim().toLowerCase();
+  return diagnosisReports.filter(row => {
+    if (!passDimensions(row)) return false;
+    if (selectedKey && rowKey(row) !== selectedKey) return false;
+    if (selectedStatus && selectedStatus !== "高优先级异动") return false;
+    if (!q) return true;
+    const haystack = [row["父ASIN"], row["商品名"], row["异动指标"], row["诊断状态"], row["报告类型"]].join(" ").toLowerCase();
+    return haystack.includes(q);
   });
 }
 function setSelectOptions(select, values, allLabel, currentValue) {
@@ -510,6 +620,26 @@ function renderMetricCategoryDonut(el, legend, items) {
   }
   legend.innerHTML = items.map((item, index) => `<div><span class="${classes[index]}"></span>${esc(item.label)}：${item.value}</div>`).join("") + `<div>合计：${total}</div>`;
 }
+function renderDiagnosisReports() {
+  const rows = filteredDiagnosisReports();
+  diagnosisTitle.textContent = selectedKey ? `${selectedKey.replaceAll("||", " / ")}：${rows.length} 个高优先级ASIN` : `高优先级ASIN诊断报告：${rows.length} 个`;
+  if (!rows.length) {
+    diagnosisList.innerHTML = `<div class="empty-note">暂无高优先级ASIN诊断报告</div>`;
+    return;
+  }
+  diagnosisList.innerHTML = rows.map(row => {
+    const href = row["摘要页地址"] || row["Word报告地址"] || "";
+    const action = href ? `<a href="${esc(href)}" target="_blank" rel="noopener">查看报告</a>` : `<span class="pending">待生成</span>`;
+    const reason = row["失败原因"] ? `｜${row["失败原因"]}` : "";
+    return `<div class="report-card">
+      <div class="asin">${esc(row["父ASIN"])}</div>
+      <div class="meta">${esc(row["负责人"])}｜${esc(row["异动指标"])}｜${esc(row["报告类型"])}</div>
+      <div class="meta">${esc(row["商品名"])}</div>
+      <div class="meta">${esc(row["诊断状态"] || "未生成")}${esc(reason)}</div>
+      ${action}
+    </div>`;
+  }).join("");
+}
 function renderLine(rows) {
   const list = rows.slice(0, 10);
   const max = Math.max(1, ...list.map(row => Number(row.total || 0)));
@@ -573,7 +703,7 @@ function renderDetails() {
   </tr>`).join("");
 }
 function renderButtons() { document.querySelectorAll("button[data-status]").forEach(btn => btn.classList.toggle("active", btn.dataset.status === selectedStatus)); }
-function renderAll() { renderFilters(); renderCards(); renderVisuals(); renderSummary(); renderDetails(); renderButtons(); }
+function renderAll() { renderFilters(); renderCards(); renderVisuals(); renderDiagnosisReports(); renderSummary(); renderDetails(); renderButtons(); }
 function handleDimensionChange() {
   selectedSite = siteFilter.value;
   selectedStore = storeFilter.value;
@@ -586,7 +716,7 @@ storeFilter.addEventListener("change", handleDimensionChange);
 ownerFilter.addEventListener("change", handleDimensionChange);
 clearFilter.addEventListener("click", () => { selectedKey = ""; selectedStatus = ""; selectedSite = ""; selectedStore = ""; selectedOwner = ""; searchBox.value = ""; renderAll(); });
 document.querySelectorAll("button[data-status]").forEach(btn => btn.addEventListener("click", () => { selectedStatus = selectedStatus === btn.dataset.status ? "" : btn.dataset.status; selectedKey = ""; renderAll(); }));
-searchBox.addEventListener("input", renderDetails);
+searchBox.addEventListener("input", () => { renderVisuals(); renderDiagnosisReports(); renderDetails(); });
 renderAll();
 </script>
 </body>
@@ -601,7 +731,8 @@ $Dashboard = $Template.
     Replace("__STORE_OPTIONS__", $StoreOptions).
     Replace("__OWNER_OPTIONS__", $OwnerOptions).
     Replace("__SUMMARY_JSON__", $SummaryJson).
-    Replace("__DETAILS_JSON__", $DetailsJson)
+    Replace("__DETAILS_JSON__", $DetailsJson).
+    Replace("__DIAGNOSIS_JSON__", $DiagnosisJson)
 
 Set-Content -LiteralPath $DashboardPath -Value $Dashboard -Encoding UTF8
 
