@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)]
     [string]$OwnerName,
     [string]$OutputDir
@@ -28,6 +28,9 @@ $TemplateNeedsRefresh = -not (Test-Path -LiteralPath $TemplatePath)
 if (-not $TemplateNeedsRefresh) {
     $ExistingTemplate = Get-Content -LiteralPath $TemplatePath -Raw -Encoding UTF8
     $TemplateNeedsRefresh = -not $ExistingTemplate.Contains("const diagnosisReports =")
+    if (-not $TemplateNeedsRefresh) {
+        $TemplateNeedsRefresh = -not $ExistingTemplate.Contains("异动识别方式")
+    }
 }
 if ($TemplateNeedsRefresh) {
     $RendererCode = Get-Content -LiteralPath (Join-Path $ScriptDir "generate_lingxing_powerbi_style_dashboard.ps1") -Raw -Encoding UTF8

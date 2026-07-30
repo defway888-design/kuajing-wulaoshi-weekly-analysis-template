@@ -150,6 +150,74 @@ previous value > 0 and current value = 0 -> -100%, continue anomaly judgment
 previous value = 0 and current value = 0 -> not an anomaly
 ```
 
+## 30-Day Dual-Window Trend Anomaly
+
+Purpose:
+
+```text
+catch gradual traffic or conversion deterioration/improvement that does not trigger the single-period threshold in the current cycle
+```
+
+This rule runs only after the single-period anomaly rule does not trigger.
+
+Candidate pool:
+
+```text
+10% <= traffic absolute change < 30%
+or
+20% <= conversion absolute change < 50%
+```
+
+If the parent ASIN is outside this candidate pool, do not run the 30-day trend calculation.
+
+Data-call principle:
+
+```text
+use query_product_performance_asin_lists with summary_field = parent_asin
+use date-range summary windows instead of requiring daily-granularity output
+```
+
+Recent trend windows:
+
+```text
+recent 30-day observation window ending at T-3
+early window = first 7 days in that 30-day window
+late window = last 7 days in that 30-day window
+middle 16 days are not used for calculation
+```
+
+Trend metrics:
+
+```text
+traffic trend = late-window daily average traffic vs early-window daily average traffic
+conversion trend = late-window weighted conversion vs early-window weighted conversion
+```
+
+Trend thresholds:
+
+```text
+traffic absolute trend change >= 30%
+conversion absolute trend change >= 50%
+```
+
+Historical trend judgment:
+
+```text
+compare the same early/late 7-day windows in the corresponding 30-day period last year
+history must explain movement magnitude within tolerance, not direction only
+no comparable historical trend data -> 待复核异动
+history explains the trend -> exclude from output
+history exists but does not explain the trend -> 高优先级异动
+```
+
+Trend output fields:
+
+```text
+异动识别方式 = 30天双窗口趋势异动
+趋势候选原因 = 流量接近阈值 / 转化率接近阈值 / 流量+转化率同时接近阈值
+趋势判断窗口 = 最近30天前7天 vs 后7天
+```
+
 ## Owner Transition
 
 Purpose:
@@ -296,6 +364,9 @@ If diagnosis fails, keep the ASIN in the index with failure status and reason. D
 当前值
 上月值
 变化率
+异动识别方式
+趋势候选原因
+趋势判断窗口
 历史判断
 待复核原因
 最终状态

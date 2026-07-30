@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$OutputDir
 )
 
@@ -64,7 +64,11 @@ $Details = foreach ($Row in $RawDetails) {
         "当前值" = $Row.'当前值'
         "上月值" = $Row.'上月值'
         "变化率" = $Row.'变化率'
+        "异动识别方式" = $Row.'异动识别方式'
+        "趋势候选原因" = $Row.'趋势候选原因'
+        "趋势判断窗口" = $Row.'趋势判断窗口'
         "历史判断" = $Row.'历史判断'
+        "待复核原因" = $Row.'待复核原因'
         "最终状态" = $Status
     }
 }
@@ -425,7 +429,7 @@ tr:hover, tr.selected { background:rgba(255,255,255,.16); }
     <div class="panel pink table-panel review-detail-grid">
       <h2>待复核异动明细</h2>
       <div class="detail-title" id="reviewDetailTitle">当前显示全部待复核明细</div>
-      <div class="table-wrap"><table id="reviewDetailTable"><thead><tr><th>父ASIN</th><th class="product">商品名</th><th>异动指标</th><th>变化率</th><th>待复核原因</th><th>历史判断</th></tr></thead><tbody></tbody></table></div>
+      <div class="table-wrap"><table id="reviewDetailTable"><thead><tr><th>父ASIN</th><th class="product">商品名</th><th>异动指标</th><th>变化率</th><th>异动识别方式</th><th>趋势候选原因</th><th>趋势判断窗口</th><th>待复核原因</th><th>历史判断</th></tr></thead><tbody></tbody></table></div>
     </div>
     <div class="panel pink table-panel detail-grid" style="display:none;">
       <h2>负责人汇总与异动明细</h2>
@@ -439,7 +443,7 @@ tr:hover, tr.selected { background:rgba(255,255,255,.16); }
       </div>
       <div class="table-wrap" style="margin-bottom:10px;"><table id="summaryTable"><thead><tr><th>站点</th><th>店铺</th><th>负责人</th><th class="num">异动商品数</th><th class="num">高优先级异动</th><th class="num">待复核异动</th></tr></thead><tbody></tbody></table></div>
       <div class="detail-title" id="detailTitle">当前显示全部明细</div>
-      <div class="table-wrap"><table id="detailTable"><thead><tr><th>站点</th><th>店铺</th><th>负责人</th><th>父ASIN</th><th class="product">商品名</th><th>异动指标</th><th>当前值</th><th>上月值</th><th>变化率</th><th>历史判断</th><th>待复核原因</th><th>最终状态</th></tr></thead><tbody></tbody></table></div>
+      <div class="table-wrap"><table id="detailTable"><thead><tr><th>站点</th><th>店铺</th><th>负责人</th><th>父ASIN</th><th class="product">商品名</th><th>异动指标</th><th>当前值</th><th>上月值</th><th>变化率</th><th>异动识别方式</th><th>趋势候选原因</th><th>趋势判断窗口</th><th>历史判断</th><th>待复核原因</th><th>最终状态</th></tr></thead><tbody></tbody></table></div>
     </div>
   </section>
 </main>
@@ -484,6 +488,8 @@ function rowKey(row) { return [row["站点"], row["店铺"], row["负责人"]].j
 function uniqueValues(rows, field) { return [...new Set(rows.map(row => row[field]).filter(Boolean))].sort((a,b) => String(a).localeCompare(String(b), "zh-Hans-CN")); }
 function reviewReason(row) {
   if (row["最终状态"] !== "待复核异动") return "";
+  const explicitReason = String(row["待复核原因"] || "").trim();
+  if (explicitReason) return explicitReason;
   const history = String(row["历史判断"] || "").trim();
   const normalized = history.replace(/\s+/g, "");
   if (/从0新增|从零新增|上月值为0/.test(normalized)) return "从0新增";
@@ -695,7 +701,7 @@ function renderDetails() {
   detailTable.querySelector("tbody").innerHTML = rows.map(row => `<tr>
     <td>${esc(row["站点"])}</td><td>${esc(row["店铺"])}</td><td>${esc(row["负责人"])}</td><td>${esc(row["父ASIN"])}</td>
     <td>${esc(row["商品名"])}</td><td>${esc(row["异动指标"])}</td><td>${esc(row["当前值"])}</td><td>${esc(row["上月值"])}</td>
-    <td>${esc(row["变化率"])}</td><td>${esc(row["历史判断"])}</td><td>${esc(reviewReason(row))}</td><td class="${row["最终状态"] === "高优先级异动" ? "status-high" : "status-review"}">${esc(row["最终状态"])}</td>
+    <td>${esc(row["变化率"])}</td><td>${esc(row["异动识别方式"])}</td><td>${esc(row["趋势候选原因"])}</td><td>${esc(row["趋势判断窗口"])}</td><td>${esc(row["历史判断"])}</td><td>${esc(reviewReason(row))}</td><td class="${row["最终状态"] === "高优先级异动" ? "status-high" : "status-review"}">${esc(row["最终状态"])}</td>
   </tr>`).join("");
 }
 function renderReviewDetails() {
@@ -704,7 +710,7 @@ function renderReviewDetails() {
   reviewDetailTitle.textContent = selectedKey ? `${selectedKey.replaceAll("||", " / ")}${reasonText}：${rows.length} 条待复核` : `待复核异动明细${reasonText}：${rows.length} 条`;
   reviewDetailTable.querySelector("tbody").innerHTML = rows.map(row => `<tr>
     <td>${esc(row["父ASIN"])}</td><td>${esc(row["商品名"])}</td><td>${esc(row["异动指标"])}</td>
-    <td>${esc(row["变化率"])}</td><td>${esc(reviewReason(row))}</td><td>${esc(row["历史判断"])}</td>
+    <td>${esc(row["变化率"])}</td><td>${esc(row["异动识别方式"])}</td><td>${esc(row["趋势候选原因"])}</td><td>${esc(row["趋势判断窗口"])}</td><td>${esc(reviewReason(row))}</td><td>${esc(row["历史判断"])}</td>
   </tr>`).join("");
 }
 function renderButtons() { document.querySelectorAll("button[data-status]").forEach(btn => btn.classList.toggle("active", btn.dataset.status === selectedStatus)); }

@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory = $true)]
     [string]$OutputDir
 )
@@ -39,7 +39,7 @@ if ($Errors.Count -eq 0) {
     $Details = @(Import-Csv -LiteralPath $DetailPath)
 
     Require-Columns $Summary @("站点", "店铺", "负责人", "异动商品数", "高优先级异动", "待复核异动") "负责人汇总表"
-    Require-Columns $Details @("站点", "店铺", "负责人", "父ASIN", "商品名", "异动指标", "当前值", "上月值", "变化率", "历史判断", "最终状态") "异动明细表"
+    Require-Columns $Details @("站点", "店铺", "负责人", "父ASIN", "商品名", "异动指标", "当前值", "上月值", "变化率", "异动识别方式", "趋势候选原因", "趋势判断窗口", "历史判断", "待复核原因", "最终状态") "异动明细表"
 
     $SummaryTotal = 0
     foreach ($Row in $Summary) {
@@ -57,9 +57,28 @@ if ($Errors.Count -eq 0) {
     }
 
     $AllowedStatuses = @("高优先级异动", "待复核异动")
+    $AllowedDetectionModes = @("单周期异动", "30天双窗口趋势异动", "单周期+30天双窗口趋势异动")
+    $AllowedTrendReasons = @("", "流量接近阈值", "转化率接近阈值", "流量+转化率同时接近阈值")
     foreach ($Row in $Details) {
         if ($AllowedStatuses -notcontains $Row.'最终状态') {
             Add-Error "明细表存在非法最终状态：$($Row.'最终状态')"
+        }
+        if ($AllowedDetectionModes -notcontains $Row.'异动识别方式') {
+            Add-Error "明细表存在非法异动识别方式：$($Row.'异动识别方式')"
+        }
+        if ($AllowedTrendReasons -notcontains $Row.'趋势候选原因') {
+            Add-Error "明细表存在非法趋势候选原因：$($Row.'趋势候选原因')"
+        }
+        if ($Row.'异动识别方式' -eq "30天双窗口趋势异动") {
+            if ([string]::IsNullOrWhiteSpace($Row.'趋势候选原因')) {
+                Add-Error "30天趋势异动缺少趋势候选原因：$($Row.'父ASIN')"
+            }
+            if ([string]::IsNullOrWhiteSpace($Row.'趋势判断窗口')) {
+                Add-Error "30天趋势异动缺少趋势判断窗口：$($Row.'父ASIN')"
+            }
+        }
+        if ($Row.'异动识别方式' -eq "单周期异动" -and -not [string]::IsNullOrWhiteSpace($Row.'趋势判断窗口')) {
+            Add-Error "单周期异动不应填写趋势判断窗口：$($Row.'父ASIN')"
         }
     }
 

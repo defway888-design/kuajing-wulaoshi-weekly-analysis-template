@@ -1,4 +1,4 @@
-param(
+﻿param(
     [string]$OutputDir
 )
 
@@ -491,7 +491,7 @@ tr:hover, tr.selected { background:#eff6ff; }
       </div>
       <div class="table-wrap"><table id="summaryTable"><thead><tr><th>站点</th><th>店铺</th><th>负责人</th><th class="num">异动商品数</th><th class="num">高优先级异动</th><th class="num">待复核异动</th></tr></thead><tbody></tbody></table></div>
       <div class="detail-title" id="detailTitle">当前显示全部明细</div>
-      <div class="table-wrap detail"><table id="detailTable"><thead><tr><th>站点</th><th>店铺</th><th>负责人</th><th>父ASIN</th><th class="product">商品名</th><th>异动指标</th><th>当前值</th><th>上月值</th><th>变化率</th><th>历史判断</th><th>最终状态</th></tr></thead><tbody></tbody></table></div>
+      <div class="table-wrap detail"><table id="detailTable"><thead><tr><th>站点</th><th>店铺</th><th>负责人</th><th>父ASIN</th><th class="product">商品名</th><th>异动指标</th><th>当前值</th><th>上月值</th><th>变化率</th><th>异动识别方式</th><th>趋势候选原因</th><th>趋势判断窗口</th><th>历史判断</th><th>待复核原因</th><th>最终状态</th></tr></thead><tbody></tbody></table></div>
     </div>
   </section>
 </main>
@@ -699,7 +699,8 @@ function renderDetails() {
   detailTable.querySelector("tbody").innerHTML = rows.map(row => `<tr>
     <td>${esc(row["站点"])}</td><td>${esc(row["店铺"])}</td><td>${esc(row["负责人"])}</td><td>${esc(row["父ASIN"])}</td>
     <td>${esc(row["商品名"])}</td><td>${esc(row["异动指标"])}</td><td>${esc(row["当前值"])}</td>
-    <td>${esc(row["上月值"])}</td><td>${esc(row["变化率"])}</td><td>${esc(row["历史判断"])}</td><td class="${row["最终状态"] === "高优先级异动" ? "status-high" : "status-review"}">${esc(row["最终状态"])}</td>
+    <td>${esc(row["上月值"])}</td><td>${esc(row["变化率"])}</td><td>${esc(row["异动识别方式"])}</td>
+    <td>${esc(row["趋势候选原因"])}</td><td>${esc(row["趋势判断窗口"])}</td><td>${esc(row["历史判断"])}</td><td>${esc(row["待复核原因"])}</td><td class="${row["最终状态"] === "高优先级异动" ? "status-high" : "status-review"}">${esc(row["最终状态"])}</td>
   </tr>`).join("");
 }
 function renderButtons() { document.querySelectorAll("button[data-status]").forEach(btn => btn.classList.toggle("active", btn.dataset.status === selectedStatus)); }

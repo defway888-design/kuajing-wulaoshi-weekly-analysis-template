@@ -28,6 +28,23 @@
       "流量+转化率异动": "traffic_and_conversion_combined"
     }
   },
+  "trend_anomaly": {
+    "enabled": true,
+    "name": "30天双窗口趋势异动",
+    "candidate_pool": {
+      "traffic_abs_change_min": 0.10,
+      "traffic_abs_change_max_exclusive": 0.30,
+      "conversion_abs_change_min": 0.20,
+      "conversion_abs_change_max_exclusive": 0.50
+    },
+    "observation_window_days": 30,
+    "early_window_days": 7,
+    "late_window_days": 7,
+    "trend_window_label": "最近30天前7天 vs 后7天",
+    "daily_granularity_required": false,
+    "middle_days_policy": "not_used_for_compute_control",
+    "history_same_window_last_year": true
+  },
   "email_packaging": {
     "attachment_threshold_source": "sender_provider_current_official_rule",
     "attachment_safety_ratio": 0.7,

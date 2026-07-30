@@ -1,6 +1,6 @@
 ---
 name: kuajing-wulaoshi-weekly-analysis
-description: Build and operate the 跨境吴老师周数据分析 workflow for weekly parent-ASIN anomaly review. Use when Codex needs to calculate traffic or conversion anomalies, run high-priority ASIN diagnosis routing, generate Word diagnosis reports, generate 负责人BI and 异动明细BI outputs, split owner-only dashboards, package boss/owner email attachments, guide sender mailbox setup, configure weekly email delivery, or maintain the fixed rules, schemas, templates, and permissions for this branded workflow.
+description: Build and operate the 跨境吴老师周数据分析 workflow for weekly parent-ASIN anomaly review. Use when Codex needs to calculate single-period or 30-day dual-window trend traffic/conversion anomalies, run high-priority ASIN diagnosis routing, generate Word diagnosis reports, generate 负责人BI and 异动明细BI outputs, split owner-only dashboards, package boss/owner email attachments, guide sender mailbox setup, configure weekly email delivery, or maintain the fixed rules, schemas, templates, and permissions for this branded workflow.
 ---
 
 # 跨境吴老师周数据分析Skill
@@ -36,6 +36,8 @@ Default progress messages:
 跨境吴老师正在检查业务模板版本...
 跨境吴老师正在获取业务数据...
 跨境吴老师正在分析父商品流量与转化率异动...
+跨境吴老师正在筛选30天趋势候选商品...
+跨境吴老师正在判断30天双窗口趋势异动...
 跨境吴老师正在识别高优先级ASIN...
 跨境吴老师正在生成高优先级ASIN诊断报告...
 跨境吴老师正在生成负责人汇总表...
@@ -193,6 +195,69 @@ Anomaly thresholds:
 ```text
 traffic absolute change >= 30%
 conversion absolute change >= 50%
+```
+
+30-day dual-window trend anomaly:
+
+Use this only as a second-layer check after a parent ASIN does not trigger the single-period anomaly thresholds above.
+
+Candidate pool:
+
+```text
+10% <= traffic absolute change < 30%
+or
+20% <= conversion absolute change < 50%
+```
+
+If a parent ASIN does not enter this candidate pool, do not run the 30-day trend calculation.
+
+Trend query principle:
+
+```text
+use date-range summaries from query_product_performance_asin_lists
+do not require daily-granularity output
+recent 30-day observation window ending at T-3
+early window = first 7 days in that 30-day window
+late window = last 7 days in that 30-day window
+middle 16 days = not used for calculation, reserved only as buffer/context
+```
+
+Trend comparison:
+
+```text
+traffic trend change = late-window daily average traffic vs early-window daily average traffic
+conversion trend change = late-window weighted conversion vs early-window weighted conversion
+```
+
+Trend anomaly thresholds reuse the fixed anomaly thresholds:
+
+```text
+traffic absolute trend change >= 30%
+conversion absolute trend change >= 50%
+```
+
+Trend history check:
+
+```text
+compare the same early/late 7-day windows in the corresponding 30-day period last year
+use the same history tolerances as the single-period rule
+history must explain the movement magnitude, not only direction
+```
+
+Trend anomaly output fields:
+
+```text
+异动识别方式 = 30天双窗口趋势异动
+趋势候选原因 = 流量接近阈值 / 转化率接近阈值 / 流量+转化率同时接近阈值
+趋势判断窗口 = 最近30天前7天 vs 后7天
+```
+
+Single-period anomaly output fields:
+
+```text
+异动识别方式 = 单周期异动
+趋势候选原因 = empty
+趋势判断窗口 = empty
 ```
 
 History check:
@@ -397,6 +462,9 @@ Columns:
 当前值
 上月值
 变化率
+异动识别方式
+趋势候选原因
+趋势判断窗口
 历史判断
 待复核原因
 最终状态
@@ -628,6 +696,9 @@ Always validate:
 汇总表异动商品数合计 = 明细表行数
 each summary row: 异动商品数 = 高优先级异动 + 待复核异动
 最终状态 only uses allowed values
+异动明细表 includes 异动识别方式 / 趋势候选原因 / 趋势判断窗口
+30天双窗口趋势异动 only runs for the locked candidate pool
+30天双窗口趋势异动 rows must include 趋势候选原因 and 趋势判断窗口
 负责人BI contains no forbidden modules
 异动明细BI was not modified unless explicitly requested
 owner-specific HTML contains no other owner data
@@ -649,6 +720,8 @@ scripts/generate_lingxing_powerbi_style_dashboard.ps1
 scripts/generate_lingxing_owner_powerbi_dashboard.ps1
 scripts/validate_weekly_analysis_outputs.ps1
 ```
+
+Use `references/trend-anomaly-flow.md` for the locked 30-day dual-window trend anomaly logic.
 
 The `lingxing` text in script file names is technical implementation detail only. Do not expose it as the skill brand.
 
