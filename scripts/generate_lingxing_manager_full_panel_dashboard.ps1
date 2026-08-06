@@ -58,11 +58,18 @@ if (Test-Path -LiteralPath $DiagnosisIndexPath) {
             "父ASIN" = Get-FieldValue $_ @("父ASIN", "parent_asin", "asin")
             "商品名" = Get-FieldValue $_ @("商品名", "product_name")
             "异动指标" = Get-FieldValue $_ @("异动指标", "metric_type")
+            "高优先级类型" = Get-FieldValue $_ @("高优先级类型", "high_priority_type")
             "诊断状态" = Get-FieldValue $_ @("诊断状态", "diagnosis_status")
+            "核心诊断状态" = Get-FieldValue $_ @("核心诊断状态", "core_diagnosis_status")
+            "可发送状态" = Get-FieldValue $_ @("可发送状态", "send_status")
             "报告类型" = Get-FieldValue $_ @("报告类型", "report_type")
             "摘要页地址" = Get-FieldValue $_ @("摘要页地址", "summary_page_path", "summary_url", "报告地址")
             "Word报告地址" = Get-FieldValue $_ @("Word报告地址", "word_report_path", "docx_path")
+            "证据缺口类型" = Get-FieldValue $_ @("证据缺口类型", "evidence_gap_type")
+            "证据缺口说明" = Get-FieldValue $_ @("证据缺口说明", "evidence_gap_detail")
+            "字段映射记录" = Get-FieldValue $_ @("字段映射记录", "field_mapping_log")
             "失败原因" = Get-FieldValue $_ @("失败原因", "failure_reason")
+            "阻断原因" = Get-FieldValue $_ @("阻断原因", "blocking_reason")
         }
     })
 } else {
@@ -74,11 +81,18 @@ if (Test-Path -LiteralPath $DiagnosisIndexPath) {
             "父ASIN" = $_.'父ASIN'
             "商品名" = $_.'商品名'
             "异动指标" = $_.'异动指标'
+            "高优先级类型" = $_.'高优先级类型'
             "诊断状态" = "未生成"
+            "核心诊断状态" = "未生成"
+            "可发送状态" = "禁止发送"
             "报告类型" = Get-DiagnosisReportType $_.'异动指标'
             "摘要页地址" = ""
             "Word报告地址" = ""
+            "证据缺口类型" = ""
+            "证据缺口说明" = ""
+            "字段映射记录" = ""
             "失败原因" = ""
+            "阻断原因" = "未生成诊断报告"
         }
     })
 }
@@ -233,9 +247,10 @@ button.active {
 .visual-grid, .lower-grid {
   margin-top:14px;
   display:grid;
-  grid-template-columns:.95fr 1fr 1.55fr;
   gap:14px;
 }
+.visual-grid { grid-template-columns:repeat(3, minmax(0,1fr)); }
+.lower-grid { grid-template-columns:repeat(4, minmax(0,1fr)); }
 .panel {
   min-height:286px;
   padding:16px;
@@ -270,6 +285,19 @@ button.active {
   background:linear-gradient(90deg,var(--blue),var(--cyan));
 }
 .report-panel { grid-column:1 / -1; min-height:188px; }
+.report-filter-grid {
+  display:grid;
+  grid-template-columns:repeat(3, minmax(0,1fr));
+  gap:10px;
+  margin-bottom:10px;
+  padding:10px;
+  border:1px solid var(--line);
+  border-radius:10px;
+  background:var(--panel-soft);
+}
+.report-filter-grid .select-box {
+  gap:5px;
+}
 .report-list {
   display:grid;
   grid-template-columns:repeat(3, minmax(0,1fr));
@@ -444,6 +472,7 @@ tr:hover, tr.selected { background:#eff6ff; }
 @media (max-width:980px) {
   .top-grid, .visual-grid, .lower-grid { grid-template-columns:1fr; }
   .slicer-card { grid-template-columns:1fr; }
+  .report-filter-grid { grid-template-columns:1fr; }
   .title-card h1 { font-size:26px; }
   .report-list { grid-template-columns:1fr; }
   .donut-wrap { grid-template-columns:1fr; }
@@ -465,17 +494,23 @@ tr:hover, tr.selected { background:#eff6ff; }
   </section>
 
   <section class="visual-grid">
-    <div class="panel"><h2>异动商品数 by 站点</h2><div class="bar-chart" id="siteBars"></div></div>
     <div class="panel"><h2>异动类型占比</h2><div class="donut-wrap"><div class="donut" id="typeDonut"></div><div class="legend" id="typeLegend"></div></div></div>
-    <div class="panel"><h2>高优先级异动 by 负责人</h2><div class="bar-chart" id="ownerHighBars"></div></div>
+    <div class="panel"><h2>高优先异动分类占比</h2><div class="donut-wrap"><div class="donut" id="highSubtypeDonut"></div><div class="legend" id="highSubtypeLegend"></div></div></div>
+    <div class="panel"><h2>待复核异动分类占比</h2><div class="donut-wrap"><div class="donut" id="reviewReasonDonut"></div><div class="legend" id="reviewReasonLegend"></div></div></div>
   </section>
 
   <section class="lower-grid">
     <div class="panel"><h2>异动指标 by 类型</h2><div class="donut-wrap"><div class="donut" id="metricDonut"></div><div class="legend" id="metricLegend"></div></div></div>
+    <div class="panel"><h2>异动商品数 by 站点</h2><div class="bar-chart" id="siteBars"></div></div>
     <div class="panel"><h2>异动商品数 by 店铺</h2><div class="bar-chart" id="storeBars"></div></div>
-    <div class="panel"><h2>异动走势 by 负责人排序</h2><div class="line-chart" id="ownerLine"></div></div>
+    <div class="panel"><h2>异动商品数 by 负责人</h2><div class="bar-chart" id="ownerBars"></div></div>
     <div class="panel report-panel">
       <h2>高优先级ASIN诊断报告入口</h2>
+      <div class="report-filter-grid">
+        <div class="select-box"><label>站点</label><select id="reportSiteFilter"><option value="">全部站点</option></select></div>
+        <div class="select-box"><label>店铺</label><select id="reportStoreFilter"><option value="">全部店铺</option></select></div>
+        <div class="select-box"><label>运营人员</label><select id="reportOwnerFilter"><option value="">全部运营人员</option></select></div>
+      </div>
       <div class="detail-title" id="diagnosisTitle">当前高优先级ASIN诊断报告</div>
       <div class="report-list" id="diagnosisList"></div>
     </div>
@@ -489,9 +524,9 @@ tr:hover, tr.selected { background:#eff6ff; }
         </div>
         <input id="searchBox" placeholder="搜索父ASIN / 商品名">
       </div>
-      <div class="table-wrap"><table id="summaryTable"><thead><tr><th>站点</th><th>店铺</th><th>负责人</th><th class="num">异动商品数</th><th class="num">高优先级异动</th><th class="num">待复核异动</th></tr></thead><tbody></tbody></table></div>
+      <div class="table-wrap"><table id="summaryTable"><thead><tr><th>站点</th><th>店铺</th><th>负责人</th><th class="num">异动商品数</th><th class="num">高优先级异动</th><th class="num">当期高优先异动</th><th class="num">缓慢高优先异动</th><th class="num">待复核异动</th></tr></thead><tbody></tbody></table></div>
       <div class="detail-title" id="detailTitle">当前显示全部明细</div>
-      <div class="table-wrap detail"><table id="detailTable"><thead><tr><th>站点</th><th>店铺</th><th>负责人</th><th>父ASIN</th><th class="product">商品名</th><th>异动指标</th><th>当前值</th><th>上月值</th><th>变化率</th><th>异动识别方式</th><th>趋势候选原因</th><th>趋势判断窗口</th><th>历史判断</th><th>待复核原因</th><th>最终状态</th></tr></thead><tbody></tbody></table></div>
+      <div class="table-wrap detail"><table id="detailTable"><thead><tr><th>站点</th><th>店铺</th><th>负责人</th><th>父ASIN</th><th class="product">商品名</th><th>异动指标</th><th>当前值</th><th>上月值</th><th>变化率</th><th>异动识别方式</th><th>趋势候选原因</th><th>趋势判断窗口</th><th>历史判断</th><th>待复核原因</th><th>最终状态</th><th>高优先级类型</th></tr></thead><tbody></tbody></table></div>
     </div>
   </section>
 </main>
@@ -505,6 +540,9 @@ let selectedStatus = "";
 let selectedSite = "";
 let selectedStore = "";
 let selectedOwner = "";
+let reportSite = "";
+let reportStore = "";
+let reportOwner = "";
 const siteFilter = document.getElementById("siteFilter");
 const storeFilter = document.getElementById("storeFilter");
 const ownerFilter = document.getElementById("ownerFilter");
@@ -512,15 +550,21 @@ const totalCard = document.getElementById("totalCard");
 const highCard = document.getElementById("highCard");
 const reviewCard = document.getElementById("reviewCard");
 const siteBars = document.getElementById("siteBars");
-const ownerHighBars = document.getElementById("ownerHighBars");
+const ownerBars = document.getElementById("ownerBars");
 const storeBars = document.getElementById("storeBars");
 const typeDonut = document.getElementById("typeDonut");
 const typeLegend = document.getElementById("typeLegend");
+const highSubtypeDonut = document.getElementById("highSubtypeDonut");
+const highSubtypeLegend = document.getElementById("highSubtypeLegend");
+const reviewReasonDonut = document.getElementById("reviewReasonDonut");
+const reviewReasonLegend = document.getElementById("reviewReasonLegend");
 const metricDonut = document.getElementById("metricDonut");
 const metricLegend = document.getElementById("metricLegend");
 const diagnosisTitle = document.getElementById("diagnosisTitle");
 const diagnosisList = document.getElementById("diagnosisList");
-const ownerLine = document.getElementById("ownerLine");
+const reportSiteFilter = document.getElementById("reportSiteFilter");
+const reportStoreFilter = document.getElementById("reportStoreFilter");
+const reportOwnerFilter = document.getElementById("reportOwnerFilter");
 const summaryTable = document.getElementById("summaryTable");
 const detailTitle = document.getElementById("detailTitle");
 const detailTable = document.getElementById("detailTable");
@@ -533,6 +577,12 @@ function passDimensions(row) {
   if (selectedSite && row["站点"] !== selectedSite) return false;
   if (selectedStore && row["店铺"] !== selectedStore) return false;
   if (selectedOwner && row["负责人"] !== selectedOwner) return false;
+  return true;
+}
+function passReportDimensions(row) {
+  if (reportSite && row["站点"] !== reportSite) return false;
+  if (reportStore && row["店铺"] !== reportStore) return false;
+  if (reportOwner && row["负责人"] !== reportOwner) return false;
   return true;
 }
 function filteredSummaryRows() { return summary.filter(passDimensions); }
@@ -550,10 +600,11 @@ function filteredDiagnosisReports() {
   const q = searchBox.value.trim().toLowerCase();
   return diagnosisReports.filter(row => {
     if (!passDimensions(row)) return false;
+    if (!passReportDimensions(row)) return false;
     if (selectedKey && rowKey(row) !== selectedKey) return false;
     if (selectedStatus && selectedStatus !== "高优先级异动") return false;
     if (!q) return true;
-    const haystack = [row["父ASIN"], row["商品名"], row["异动指标"], row["诊断状态"], row["报告类型"]].join(" ").toLowerCase();
+    const haystack = [row["父ASIN"], row["商品名"], row["异动指标"], row["诊断状态"], row["核心诊断状态"], row["可发送状态"], row["证据缺口类型"], row["报告类型"]].join(" ").toLowerCase();
     return haystack.includes(q);
   });
 }
@@ -568,6 +619,14 @@ function renderFilters() {
   selectedStore = setSelectOptions(storeFilter, uniqueValues(storeBase, "店铺"), "全部店铺", selectedStore);
   const ownerBase = storeBase.filter(row => !selectedStore || row["店铺"] === selectedStore);
   selectedOwner = setSelectOptions(ownerFilter, uniqueValues(ownerBase, "负责人"), "全部负责人", selectedOwner);
+}
+function renderReportFilters() {
+  const base = diagnosisReports.filter(passDimensions);
+  reportSite = setSelectOptions(reportSiteFilter, uniqueValues(base, "站点"), "全部站点", reportSite);
+  const storeBase = base.filter(row => !reportSite || row["站点"] === reportSite);
+  reportStore = setSelectOptions(reportStoreFilter, uniqueValues(storeBase, "店铺"), "全部店铺", reportStore);
+  const ownerBase = storeBase.filter(row => !reportStore || row["店铺"] === reportStore);
+  reportOwner = setSelectOptions(reportOwnerFilter, uniqueValues(ownerBase, "负责人"), "全部运营人员", reportOwner);
 }
 function aggregate(rows, field) {
   const map = new Map();
@@ -620,6 +679,43 @@ function renderMetricCategoryDonut(el, legend, items) {
   }
   legend.innerHTML = items.map((item, index) => `<div><span class="${classes[index]}"></span>${esc(item.label)}：${item.value}</div>`).join("") + `<div>合计：${total}</div>`;
 }
+function renderCategoryDonut(el, legend, items) {
+  const colors = ["var(--orange)", "var(--blue)", "var(--amber)", "var(--green)", "#7c3aed", "#0f766e", "#be123c"];
+  const total = items.reduce((sum, item) => sum + Number(item.value || 0), 0);
+  const cleanItems = items.filter(item => Number(item.value || 0) > 0);
+  if (!total || !cleanItems.length) {
+    el.style.background = "conic-gradient(#e5ebf3 0deg,#e5ebf3 360deg)";
+    legend.innerHTML = `<div>暂无数据</div><div>合计：0</div>`;
+    return;
+  }
+  let start = 0;
+  const segments = cleanItems.map((item, index) => {
+    const end = start + (Number(item.value || 0) / total * 360);
+    const segment = `${colors[index % colors.length]} ${start}deg ${end}deg`;
+    start = end;
+    return segment;
+  });
+  el.style.background = `conic-gradient(${segments.join(",")})`;
+  legend.innerHTML = cleanItems.map((item, index) => `<div><span style="background:${colors[index % colors.length]}"></span>${esc(item.label)}：${item.value}</div>`).join("") + `<div>合计：${total}</div>`;
+}
+function reviewReason(row) {
+  const direct = String(row["待复核原因"] || "").trim();
+  if (direct) return direct;
+  const history = String(row["历史判断"] || "");
+  if (history.includes("从0新增")) return "从0新增";
+  if (history.includes("样本不足") || history.includes("低样本")) return "低样本";
+  if (history.includes("负责人变更")) return "负责人变更";
+  if (history.includes("无历史数据")) return "无历史数据";
+  return "其他";
+}
+function countDetailsBy(rows, labelFn) {
+  const map = new Map();
+  rows.forEach(row => {
+    const label = labelFn(row) || "其他";
+    map.set(label, (map.get(label) || 0) + 1);
+  });
+  return [...map.entries()].map(([label, value]) => ({ label, value })).sort((a,b) => b.value - a.value);
+}
 function renderDiagnosisReports() {
   const rows = filteredDiagnosisReports();
   diagnosisTitle.textContent = selectedKey ? `${selectedKey.replaceAll("||", " / ")}：${rows.length} 个高优先级ASIN` : `高优先级ASIN诊断报告：${rows.length} 个`;
@@ -630,12 +726,16 @@ function renderDiagnosisReports() {
   diagnosisList.innerHTML = rows.map(row => {
     const href = row["摘要页地址"] || row["Word报告地址"] || "";
     const action = href ? `<a href="${esc(href)}" target="_blank" rel="noopener">查看报告</a>` : `<span class="pending">待生成</span>`;
-    const reason = row["失败原因"] ? `｜${row["失败原因"]}` : "";
+    const diagnosisState = row["核心诊断状态"] || row["诊断状态"] || "未生成";
+    const sendState = row["可发送状态"] ? `｜${row["可发送状态"]}` : "";
+    const gap = row["证据缺口类型"] ? `｜证据缺口：${row["证据缺口类型"]}` : "";
+    const reasonText = row["阻断原因"] || row["失败原因"] || "";
+    const reason = reasonText ? `｜${reasonText}` : "";
     return `<div class="report-card">
       <div class="asin">${esc(row["父ASIN"])}</div>
-      <div class="meta">${esc(row["负责人"])}｜${esc(row["异动指标"])}｜${esc(row["报告类型"])}</div>
+      <div class="meta">${esc(row["负责人"])}｜${esc(row["异动指标"])}｜${esc(row["高优先级类型"] || "高优先级异动")}｜${esc(row["报告类型"])}</div>
       <div class="meta">${esc(row["商品名"])}</div>
-      <div class="meta">${esc(row["诊断状态"] || "未生成")}${esc(reason)}</div>
+      <div class="meta">${esc(diagnosisState)}${esc(sendState)}${esc(gap)}${esc(reason)}</div>
       ${action}
     </div>`;
   }).join("");
@@ -661,19 +761,26 @@ function renderLine(rows) {
 }
 function renderVisuals() {
   const rows = filteredSummaryRows();
+  const dimensionDetails = details.filter(passDimensions);
   const high = rows.reduce((s,row) => s + Number(row["高优先级异动"] || 0), 0);
+  const currentHigh = rows.reduce((s,row) => s + Number(row["当期高优先异动"] || 0), 0);
+  const slowHigh = rows.reduce((s,row) => s + Number(row["缓慢高优先异动"] || 0), 0);
   const review = rows.reduce((s,row) => s + Number(row["待复核异动"] || 0), 0);
-  renderBars(siteBars, aggregate(rows, "站点"), "total");
-  renderBars(ownerHighBars, aggregate(rows, "负责人"), "high");
-  renderBars(storeBars, aggregate(rows, "店铺"), "total");
   renderDonut(typeDonut, typeLegend, high, review);
-  const metricRows = filteredDetails();
+  renderCategoryDonut(highSubtypeDonut, highSubtypeLegend, [
+    { label:"当期高优先异动", value:currentHigh },
+    { label:"缓慢高优先异动", value:slowHigh }
+  ]);
+  renderCategoryDonut(reviewReasonDonut, reviewReasonLegend, countDetailsBy(dimensionDetails.filter(row => row["最终状态"] === "待复核异动"), reviewReason));
+  const metricRows = dimensionDetails;
   renderMetricCategoryDonut(metricDonut, metricLegend, [
     { label:"流量异动", value:metricRows.filter(row => String(row["异动指标"]).trim() === "流量异动").length },
     { label:"转化率异动", value:metricRows.filter(row => String(row["异动指标"]).trim() === "转化率异动").length },
     { label:"流量+转化率异动", value:metricRows.filter(row => String(row["异动指标"]).trim() === "流量+转化率异动").length }
   ]);
-  renderLine(aggregate(rows, "负责人"));
+  renderBars(siteBars, aggregate(rows, "站点"), "total");
+  renderBars(storeBars, aggregate(rows, "店铺"), "total");
+  renderBars(ownerBars, aggregate(rows, "负责人"), "total");
 }
 function renderSummary() {
   const rows = filteredSummaryRows();
@@ -683,6 +790,8 @@ function renderSummary() {
       <td>${esc(row["站点"])}</td><td>${esc(row["店铺"])}</td><td>${esc(row["负责人"])}</td>
       <td class="num link" data-scope="all">${esc(row["异动商品数"])}</td>
       <td class="num link status-high" data-scope="高优先级异动">${esc(row["高优先级异动"])}</td>
+      <td class="num link status-high" data-scope="高优先级异动">${esc(row["当期高优先异动"] || 0)}</td>
+      <td class="num link status-high" data-scope="高优先级异动">${esc(row["缓慢高优先异动"] || 0)}</td>
       <td class="num link status-review" data-scope="待复核异动">${esc(row["待复核异动"])}</td>
     </tr>`;
   }).join("");
@@ -700,11 +809,11 @@ function renderDetails() {
     <td>${esc(row["站点"])}</td><td>${esc(row["店铺"])}</td><td>${esc(row["负责人"])}</td><td>${esc(row["父ASIN"])}</td>
     <td>${esc(row["商品名"])}</td><td>${esc(row["异动指标"])}</td><td>${esc(row["当前值"])}</td>
     <td>${esc(row["上月值"])}</td><td>${esc(row["变化率"])}</td><td>${esc(row["异动识别方式"])}</td>
-    <td>${esc(row["趋势候选原因"])}</td><td>${esc(row["趋势判断窗口"])}</td><td>${esc(row["历史判断"])}</td><td>${esc(row["待复核原因"])}</td><td class="${row["最终状态"] === "高优先级异动" ? "status-high" : "status-review"}">${esc(row["最终状态"])}</td>
+    <td>${esc(row["趋势候选原因"])}</td><td>${esc(row["趋势判断窗口"])}</td><td>${esc(row["历史判断"])}</td><td>${esc(row["待复核原因"])}</td><td class="${row["最终状态"] === "高优先级异动" ? "status-high" : "status-review"}">${esc(row["最终状态"])}</td><td>${esc(row["高优先级类型"])}</td>
   </tr>`).join("");
 }
 function renderButtons() { document.querySelectorAll("button[data-status]").forEach(btn => btn.classList.toggle("active", btn.dataset.status === selectedStatus)); }
-function renderAll() { renderFilters(); renderCards(); renderVisuals(); renderDiagnosisReports(); renderSummary(); renderDetails(); renderButtons(); }
+function renderAll() { renderFilters(); renderReportFilters(); renderCards(); renderVisuals(); renderDiagnosisReports(); renderSummary(); renderDetails(); renderButtons(); }
 function handleDimensionChange() {
   selectedSite = siteFilter.value;
   selectedStore = storeFilter.value;
@@ -715,7 +824,17 @@ function handleDimensionChange() {
 siteFilter.addEventListener("change", handleDimensionChange);
 storeFilter.addEventListener("change", handleDimensionChange);
 ownerFilter.addEventListener("change", handleDimensionChange);
-clearFilter.addEventListener("click", () => { selectedKey = ""; selectedStatus = ""; selectedSite = ""; selectedStore = ""; selectedOwner = ""; searchBox.value = ""; renderAll(); });
+function handleReportDimensionChange() {
+  reportSite = reportSiteFilter.value;
+  reportStore = reportStoreFilter.value;
+  reportOwner = reportOwnerFilter.value;
+  renderReportFilters();
+  renderDiagnosisReports();
+}
+reportSiteFilter.addEventListener("change", handleReportDimensionChange);
+reportStoreFilter.addEventListener("change", handleReportDimensionChange);
+reportOwnerFilter.addEventListener("change", handleReportDimensionChange);
+clearFilter.addEventListener("click", () => { selectedKey = ""; selectedStatus = ""; selectedSite = ""; selectedStore = ""; selectedOwner = ""; reportSite = ""; reportStore = ""; reportOwner = ""; searchBox.value = ""; renderAll(); });
 document.querySelectorAll("button[data-status]").forEach(btn => btn.addEventListener("click", () => { selectedStatus = selectedStatus === btn.dataset.status ? "" : btn.dataset.status; selectedKey = ""; renderAll(); }));
 searchBox.addEventListener("input", () => { renderVisuals(); renderDiagnosisReports(); renderDetails(); });
 renderAll();

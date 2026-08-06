@@ -10,7 +10,21 @@ Run deep diagnosis only for rows where:
 最终状态 = 高优先级异动
 ```
 
-Do not diagnose `待复核异动` automatically. Review-required rows include low sample, from-zero growth, owner transition, no history, and any future manual-review reason.
+Do not diagnose `待复核异动` automatically. In the single-period anomaly rule, review-required rows include low sample, from-zero growth, owner transition, no history, and any future manual-review reason.
+
+For `30天双窗口趋势异动`, those same notes are diagnosis attention points, not review reasons. A trend anomaly row must use:
+
+```text
+最终状态 = 高优先级异动
+高优先级类型 = 缓慢高优先异动
+```
+
+High-priority rows are split into:
+
+```text
+当期高优先异动
+缓慢高优先异动
+```
 
 ## Diagnosis Skill Dispatch
 
@@ -75,11 +89,18 @@ Required columns:
 父ASIN
 商品名
 异动指标
+高优先级类型
 诊断状态
+核心诊断状态
+可发送状态
 报告类型
 摘要页地址
 Word报告地址
+证据缺口类型
+证据缺口说明
+字段映射记录
 失败原因
+阻断原因
 ```
 
 Allowed `诊断状态` values:
@@ -89,6 +110,31 @@ Allowed `诊断状态` values:
 部分完成
 诊断失败
 未生成
+```
+
+Allowed `核心诊断状态` values:
+
+```text
+完整完成
+可用但有证据缺口
+阻断失败
+未生成
+```
+
+Allowed `可发送状态` values:
+
+```text
+允许发送
+禁止发送
+```
+
+Status mapping:
+
+```text
+完整完成 -> 允许发送
+可用但有证据缺口 -> 允许发送
+阻断失败 -> 禁止发送
+未生成 -> 禁止发送
 ```
 
 `摘要页地址` must point to an HTML summary page that can be opened from the BI package. `Word报告地址` points to the full `.docx` report when included in the package or owner attachment.
@@ -113,8 +159,12 @@ The module shows only compact entry information:
 商品名
 负责人
 异动指标
+高优先级类型
 报告类型
 诊断状态
+核心诊断状态
+可发送状态
+证据缺口类型
 查看报告 / 待生成
 ```
 
@@ -238,8 +288,10 @@ If a diagnosis Skill call fails:
 ```text
 do not fabricate content
 record the ASIN in 高优先级ASIN诊断报告索引.csv
-set 诊断状态 = 诊断失败 or 部分完成
-write 失败原因
+set 诊断状态 = 诊断失败
+set 核心诊断状态 = 阻断失败
+set 可发送状态 = 禁止发送
+write 失败原因 and 阻断原因
 show the status in BI
 include a manual-review note in the owner email
 keep the boss package generation running if the base BI/tables are valid
@@ -248,5 +300,56 @@ keep the boss package generation running if the base BI/tables are valid
 Formal-send rule:
 
 ```text
-do not send formal weekly email until tables, BI, package selection, diagnosis index, and recipient scoping have passed validation
+do not send formal weekly email until tables, BI, package selection, diagnosis index, recipient scoping, and all core diagnosis rows have passed validation
+allow formal sending when only auxiliary evidence gaps remain
+```
+
+## Auxiliary Evidence Gap Policy
+
+These checks improve the deep diagnosis but do not determine whether the weekly email can be sent:
+
+```text
+Seller ID
+main image
+five bullet points
+fulfillment type
+off-site promotion evidence
+affiliate promotion evidence
+strict similar-competitor review evidence
+```
+
+Off-site promotion verification:
+
+```text
+find candidate pages
+confirm the page can be opened
+confirm the page is related to the target ASIN or product
+confirm publish date
+confirm the date belongs to the analysis or anomaly period
+```
+
+If the page cannot be opened, the publish date cannot be confirmed, or the relation to the analysis period cannot be confirmed, record:
+
+```text
+证据缺口类型 = 站外推广证据未闭环
+核心诊断状态 = 可用但有证据缺口
+可发送状态 = 允许发送
+```
+
+Affiliate promotion verification:
+
+```text
+find candidate pages
+confirm the page can be opened
+confirm the page is related to the target ASIN or product
+confirm publish date
+confirm promotion or affiliate nature
+```
+
+If the publish date or affiliate/promotion nature cannot be confirmed, record:
+
+```text
+证据缺口类型 = 联盟客推广证据未闭环
+核心诊断状态 = 可用但有证据缺口
+可发送状态 = 允许发送
 ```

@@ -85,6 +85,67 @@ Use `query_product_performance_asin_lists` by `sid` and period:
 
 Paginate by offset.
 
+## Field Mapping And Blocking Rules
+
+Returned MCP fields may vary by endpoint version. Implement semantic field mapping instead of requiring a single fixed field name.
+
+Record the resolved mapping in:
+
+```text
+字段映射记录
+```
+
+Core fields are blocking because they are required to calculate the anomaly:
+
+```text
+站点
+店铺
+父ASIN
+当前周期流量
+当前周期订单量
+上月周期流量
+上月周期订单量
+周期天数
+当前周期日期范围
+上月周期日期范围
+```
+
+If a core field cannot be found through semantic mapping, the affected output is invalid for formal sending.
+
+Auxiliary fields and auxiliary evidence are non-blocking:
+
+```text
+Seller ID
+子ASIN
+SKU
+商品名
+负责人
+主图
+五点
+配送类型
+站外推广证据
+联盟客推广证据
+严格相似竞品审核证据
+```
+
+Missing auxiliary fields must be recorded as evidence gaps, not as send blockers.
+
+Default mapping table:
+
+| Business meaning | Preferred field | Allowed equivalent fields | Blocking |
+|---|---|---|---|
+| 父ASIN | parent_asin | asin, asin1, parentAsin | yes |
+| 子ASIN | asin1 | asin, child_asin | no |
+| SKU | seller_sku | msku, sku | no |
+| Seller ID | seller_id | sid, sellerId | no |
+| 流量 | sessions | sessions_total, traffic | yes |
+| 订单量 | order_count | volume, sales, units_ordered | yes |
+| 商品名 | product_name | title, item_name | no |
+| 负责人 | owner | principal_name, principal_names | no |
+| 主图 | main_image | image, image_url | no |
+| 五点 | bullet_points | bullets, features | no |
+| 配送类型 | fulfillment_type | delivery_type, fulfillment | no |
+
 ## Periods
 
 ```text
@@ -134,7 +195,7 @@ conversion +/-15 percentage points
 
 History comparison must compare change magnitude within tolerance, not direction only.
 
-Low sample rule:
+Single-period low sample rule:
 
 ```text
 current daily average traffic <= 10 or previous daily average traffic <= 10
@@ -142,7 +203,7 @@ and threshold is triggered -> 待复核异动
 历史判断 = 样本不足，需人工复核
 ```
 
-Previous value zero rule:
+Single-period previous value zero rule:
 
 ```text
 previous value = 0 and current value > 0 -> 从0新增, 待复核异动
@@ -205,9 +266,9 @@ Historical trend judgment:
 ```text
 compare the same early/late 7-day windows in the corresponding 30-day period last year
 history must explain movement magnitude within tolerance, not direction only
-no comparable historical trend data -> 待复核异动
 history explains the trend -> exclude from output
-history exists but does not explain the trend -> 高优先级异动
+history exists but does not explain the trend -> 高优先级异动, 高优先级类型 = 缓慢高优先异动
+no comparable historical trend data -> 高优先级异动, 高优先级类型 = 缓慢高优先异动
 ```
 
 Trend output fields:
@@ -216,7 +277,11 @@ Trend output fields:
 异动识别方式 = 30天双窗口趋势异动
 趋势候选原因 = 流量接近阈值 / 转化率接近阈值 / 流量+转化率同时接近阈值
 趋势判断窗口 = 最近30天前7天 vs 后7天
+最终状态 = 高优先级异动
+高优先级类型 = 缓慢高优先异动
 ```
+
+For 30-day trend anomalies, no-history, low-sample, from-zero, and owner-transition signals are written into `历史判断` as diagnosis attention points. They do not change the row to `待复核异动`.
 
 ## Owner Transition
 
@@ -244,7 +309,8 @@ Judgment:
 
 ```text
 previous owner = current owner -> continue normal history judgment
-previous owner != current owner -> 待复核异动
+previous owner != current owner and detection mode = 单周期异动 -> 待复核异动
+previous owner != current owner and detection mode = 30天双窗口趋势异动 -> 高优先级异动, 高优先级类型 = 缓慢高优先异动
 ```
 
 History judgment text:
@@ -274,8 +340,9 @@ Use only:
 Rules:
 
 ```text
-history exists and cannot explain movement -> 高优先级异动
-no historical comparable data -> 待复核异动
+single-period history exists and cannot explain movement -> 高优先级异动, 高优先级类型 = 当期高优先异动
+single-period no historical comparable data -> 待复核异动
+30-day trend anomaly not explained by history or lacking comparable history -> 高优先级异动, 高优先级类型 = 缓慢高优先异动
 history explains movement -> exclude from output
 ```
 
@@ -321,11 +388,18 @@ Required diagnosis index columns:
 父ASIN
 商品名
 异动指标
+高优先级类型
 诊断状态
+核心诊断状态
+可发送状态
 报告类型
 摘要页地址
 Word报告地址
+证据缺口类型
+证据缺口说明
+字段映射记录
 失败原因
+阻断原因
 ```
 
 Allowed `诊断状态` values:
@@ -337,7 +411,34 @@ Allowed `诊断状态` values:
 未生成
 ```
 
-If diagnosis fails, keep the ASIN in the index with failure status and reason. Do not fabricate report content.
+Allowed `核心诊断状态` values:
+
+```text
+完整完成
+可用但有证据缺口
+阻断失败
+未生成
+```
+
+Allowed `可发送状态` values:
+
+```text
+允许发送
+禁止发送
+```
+
+Diagnosis send rules:
+
+```text
+完整完成 -> 允许发送
+可用但有证据缺口 -> 允许发送
+阻断失败 -> 禁止发送
+未生成 -> 禁止发送
+```
+
+If diagnosis fails because a required core input or diagnosis Skill call is unavailable, keep the ASIN in the index with `核心诊断状态 = 阻断失败`, `可发送状态 = 禁止发送`, and `阻断原因`. Do not fabricate report content.
+
+If only auxiliary evidence is missing, keep the ASIN sendable and record `证据缺口类型` and `证据缺口说明`.
 
 ## Output Tables
 
@@ -349,7 +450,16 @@ If diagnosis fails, keep the ASIN in the index with failure status and reason. D
 负责人
 异动商品数
 高优先级异动
+当期高优先异动
+缓慢高优先异动
 待复核异动
+```
+
+负责人汇总表 invariant:
+
+```text
+高优先级异动 = 当期高优先异动 + 缓慢高优先异动
+异动商品数 = 高优先级异动 + 待复核异动
 ```
 
 异动明细表 columns:
@@ -370,6 +480,7 @@ If diagnosis fails, keep the ASIN in the index with failure status and reason. D
 历史判断
 待复核原因
 最终状态
+高优先级类型
 ```
 
 ## BI Naming
@@ -412,7 +523,22 @@ Known `待复核原因` labels:
 
 If future review reasons are added, the dashboard must display the new reason text dynamically from `历史判断` in both the review statistics and the review-detail table instead of hiding it under a generic bucket.
 
-负责人BI uses the `powerbi-full-panel-2026` visual direction but must keep the same module list and order as 异动明细BI.
+负责人BI uses the `powerbi-full-panel-2026` visual direction and must keep this fixed visual card order:
+
+```text
+1. 异动类型占比
+2. 高优先异动分类占比
+3. 待复核异动分类占比
+4. 异动指标 by 类型
+5. 异动商品数 by 站点
+6. 异动商品数 by 店铺
+7. 异动商品数 by 负责人
+8. 高优先级ASIN诊断报告入口
+```
+
+The top `高优先级异动` KPI card shows only number + label, matching `异动商品数` and `待复核异动`; it must not show `当期 / 缓慢` subtext.
+
+The `高优先级ASIN诊断报告入口` module must include local filters for `站点`, `店铺`, and `运营人员`.
 
 Forbidden modules:
 

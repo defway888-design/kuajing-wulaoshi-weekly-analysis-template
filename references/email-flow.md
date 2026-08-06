@@ -37,7 +37,8 @@ first eligible run: first Monday after authorization
 weekly task starts: Monday 00:00
 standard email send time: Monday 09:00
 if analysis is still running at 09:00: send immediately after analysis and validation succeed
-if analysis or validation fails: do not send incomplete reports
+if analysis or core validation fails: do not send blocking-failed reports
+if only auxiliary evidence gaps remain: allow sending and show the gaps in the email body
 ```
 
 Track:
@@ -114,6 +115,15 @@ do not fabricate a Word report
 keep the diagnosis index row for audit
 ```
 
+High-priority diagnosis evidence gaps:
+
+```text
+send when 可发送状态 = 允许发送
+state in the email body: 可发送，存在辅助证据缺口
+list 证据缺口类型 and 证据缺口说明 by ASIN
+do not treat Seller ID, main image, five bullet points, fulfillment type, off-site promotion evidence, affiliate promotion evidence, or strict similar-competitor evidence gaps as send blockers
+```
+
 ## Owner Email Source
 
 Current LingXing MCP does not expose owner email lookup. Use:
@@ -186,6 +196,8 @@ Prompt should show:
 涉及店铺
 异动商品数
 高优先级异动
+当期高优先异动
+缓慢高优先异动
 待复核异动
 高优先级诊断报告数
 ```
@@ -213,6 +225,7 @@ boss package type: complete | light
 boss package size and usable threshold
 owner diagnosis attachments or owner diagnosis zip
 diagnosis failures needing manual review
+diagnosis evidence gaps that are still sendable
 ```
 
 Require:

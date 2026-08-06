@@ -15,8 +15,82 @@
     "name": "<boss-name-or-remark>",
     "email": "<boss-management-recipient-email>"
   },
+  "field_mapping": {
+    "strategy": "semantic_mapping_first",
+    "record_mapping_to": "字段映射记录",
+    "core_blocking_fields": [
+      "站点",
+      "店铺",
+      "父ASIN",
+      "当前周期流量",
+      "当前周期订单量",
+      "上月周期流量",
+      "上月周期订单量",
+      "周期天数",
+      "当前周期日期范围",
+      "上月周期日期范围"
+    ],
+    "auxiliary_non_blocking_fields": [
+      "Seller ID",
+      "子ASIN",
+      "SKU",
+      "商品名",
+      "负责人",
+      "主图",
+      "五点",
+      "配送类型",
+      "站外推广证据",
+      "联盟客推广证据",
+      "严格相似竞品审核证据"
+    ],
+    "default_aliases": {
+      "父ASIN": ["parent_asin", "asin", "asin1", "parentAsin"],
+      "子ASIN": ["asin1", "asin", "child_asin"],
+      "SKU": ["seller_sku", "msku", "sku"],
+      "Seller ID": ["seller_id", "sid", "sellerId"],
+      "流量": ["sessions", "sessions_total", "traffic"],
+      "订单量": ["order_count", "volume", "sales", "units_ordered"],
+      "商品名": ["product_name", "title", "item_name"],
+      "负责人": ["owner", "principal_name", "principal_names"],
+      "主图": ["main_image", "image", "image_url"],
+      "五点": ["bullet_points", "bullets", "features"],
+      "配送类型": ["fulfillment_type", "delivery_type", "fulfillment"]
+    }
+  },
+  "evidence_gap_policy": {
+    "non_blocking_gap_status": "可用但有证据缺口",
+    "send_status_when_only_auxiliary_gap": "允许发送",
+    "gap_type_field": "证据缺口类型",
+    "gap_detail_field": "证据缺口说明",
+    "non_blocking_gap_types": [
+      "Seller ID缺失",
+      "主图缺失",
+      "五点缺失",
+      "配送类型缺失",
+      "站外推广证据未闭环",
+      "联盟客推广证据未闭环",
+      "严格相似竞品审核未闭环"
+    ]
+  },
+  "send_gate": {
+    "allow_when_core_status": [
+      "完整完成",
+      "可用但有证据缺口"
+    ],
+    "block_when_core_status": [
+      "阻断失败",
+      "未生成"
+    ],
+    "requires_validated_tables": true,
+    "requires_validated_bi": true,
+    "requires_recipient_scope_validation": true
+  },
   "high_priority_diagnosis": {
     "enabled_for_status": "高优先级异动",
+    "enabled_high_priority_types": [
+      "当期高优先异动",
+      "缓慢高优先异动"
+    ],
     "traffic_skill_repository": "https://github.com/defway888-design/kuajing-wulaoshi-amazon-traffic-anomaly-skil",
     "conversion_skill_repository": "https://github.com/defway888-design/kuajing-wulaoshi-amazon-conversion-anomaly-skill",
     "report_format": "docx",
@@ -41,6 +115,8 @@
     "early_window_days": 7,
     "late_window_days": 7,
     "trend_window_label": "最近30天前7天 vs 后7天",
+    "final_status": "高优先级异动",
+    "high_priority_type": "缓慢高优先异动",
     "daily_granularity_required": false,
     "middle_days_policy": "not_used_for_compute_control",
     "history_same_window_last_year": true

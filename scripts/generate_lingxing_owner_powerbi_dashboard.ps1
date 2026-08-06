@@ -31,6 +31,15 @@ if (-not $TemplateNeedsRefresh) {
     if (-not $TemplateNeedsRefresh) {
         $TemplateNeedsRefresh = -not $ExistingTemplate.Contains("异动识别方式")
     }
+    if (-not $TemplateNeedsRefresh) {
+        $TemplateNeedsRefresh = -not $ExistingTemplate.Contains("高优先级类型")
+    }
+    if (-not $TemplateNeedsRefresh) {
+        $TemplateNeedsRefresh = -not $ExistingTemplate.Contains("highSubtypeCard")
+    }
+    if (-not $TemplateNeedsRefresh) {
+        $TemplateNeedsRefresh = -not $ExistingTemplate.Contains("可发送状态")
+    }
 }
 if ($TemplateNeedsRefresh) {
     $RendererCode = Get-Content -LiteralPath (Join-Path $ScriptDir "generate_lingxing_powerbi_style_dashboard.ps1") -Raw -Encoding UTF8
@@ -89,11 +98,18 @@ if (Test-Path -LiteralPath $DiagnosisIndexPath) {
             "父ASIN" = Get-FieldValue $_ @("父ASIN", "parent_asin", "asin")
             "商品名" = Get-FieldValue $_ @("商品名", "product_name")
             "异动指标" = Get-FieldValue $_ @("异动指标", "metric_type")
+            "高优先级类型" = Get-FieldValue $_ @("高优先级类型", "high_priority_type")
             "诊断状态" = Get-FieldValue $_ @("诊断状态", "diagnosis_status")
+            "核心诊断状态" = Get-FieldValue $_ @("核心诊断状态", "core_diagnosis_status")
+            "可发送状态" = Get-FieldValue $_ @("可发送状态", "send_status")
             "报告类型" = Get-FieldValue $_ @("报告类型", "report_type")
             "摘要页地址" = Get-FieldValue $_ @("摘要页地址", "summary_page_path", "summary_url", "报告地址")
             "Word报告地址" = Get-FieldValue $_ @("Word报告地址", "word_report_path", "docx_path")
+            "证据缺口类型" = Get-FieldValue $_ @("证据缺口类型", "evidence_gap_type")
+            "证据缺口说明" = Get-FieldValue $_ @("证据缺口说明", "evidence_gap_detail")
+            "字段映射记录" = Get-FieldValue $_ @("字段映射记录", "field_mapping_log")
             "失败原因" = Get-FieldValue $_ @("失败原因", "failure_reason")
+            "阻断原因" = Get-FieldValue $_ @("阻断原因", "blocking_reason")
         }
     })
 } else {
@@ -105,11 +121,18 @@ if (Test-Path -LiteralPath $DiagnosisIndexPath) {
             "父ASIN" = $_.'父ASIN'
             "商品名" = $_.'商品名'
             "异动指标" = $_.'异动指标'
+            "高优先级类型" = $_.'高优先级类型'
             "诊断状态" = "未生成"
+            "核心诊断状态" = "未生成"
+            "可发送状态" = "禁止发送"
             "报告类型" = Get-DiagnosisReportType $_.'异动指标'
             "摘要页地址" = ""
             "Word报告地址" = ""
+            "证据缺口类型" = ""
+            "证据缺口说明" = ""
+            "字段映射记录" = ""
             "失败原因" = ""
+            "阻断原因" = "未生成诊断报告"
         }
     })
 }
@@ -119,6 +142,8 @@ $DetailsJson = ($Details | ConvertTo-Json -Depth 8 -Compress).Replace("<", "\u00
 $DiagnosisJson = (ConvertTo-Json -InputObject @($DiagnosisRows) -Depth 8 -Compress).Replace("<", "\u003c")
 $Total = ($Summary | Measure-Object -Property "异动商品数" -Sum).Sum
 $High = ($Summary | Measure-Object -Property "高优先级异动" -Sum).Sum
+$HighCurrent = ($Summary | Measure-Object -Property "当期高优先异动" -Sum).Sum
+$HighSlow = ($Summary | Measure-Object -Property "缓慢高优先异动" -Sum).Sum
 $Review = ($Summary | Measure-Object -Property "待复核异动" -Sum).Sum
 
 $SiteOptions = (($Summary | Select-Object -ExpandProperty "站点" -Unique | Sort-Object) | ForEach-Object { '<option value="' + (HtmlEscape $_) + '">' + (HtmlEscape $_) + '</option>' }) -join ""
@@ -136,6 +161,7 @@ $Html = [regex]::Replace($Html, '<select id="storeFilter">.*?</select>', '<selec
 $Html = [regex]::Replace($Html, '<select id="ownerFilter">.*?</select>', '<select id="ownerFilter"><option value="">全部负责人</option>' + $OwnerOptions + '</select>', [System.Text.RegularExpressions.RegexOptions]::Singleline)
 $Html = [regex]::Replace($Html, '<div class="value" id="totalCard">.*?</div>', '<div class="value" id="totalCard">' + $Total + '</div>')
 $Html = [regex]::Replace($Html, '<div class="value" id="highCard">.*?</div>', '<div class="value" id="highCard">' + $High + '</div>')
+$Html = [regex]::Replace($Html, '<div class="subvalue" id="highSubtypeCard">.*?</div>', '<div class="subvalue" id="highSubtypeCard">当期 ' + $HighCurrent + ' / 缓慢 ' + $HighSlow + '</div>')
 $Html = [regex]::Replace($Html, '<div class="value" id="reviewCard">.*?</div>', '<div class="value" id="reviewCard">' + $Review + '</div>')
 $Html = $Html.Replace("<title>异动明细BI</title>", "<title>$OwnerName 异动明细BI</title>")
 

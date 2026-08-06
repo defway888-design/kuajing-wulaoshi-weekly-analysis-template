@@ -70,6 +70,7 @@ $Details = foreach ($Row in $RawDetails) {
         "历史判断" = $Row.'历史判断'
         "待复核原因" = $Row.'待复核原因'
         "最终状态" = $Status
+        "高优先级类型" = $Row.'高优先级类型'
     }
 }
 
@@ -83,6 +84,8 @@ $Summary = $Details |
             "负责人" = $First.'负责人'
             "异动商品数" = $_.Count
             "高优先级异动" = @($_.Group | Where-Object { $_.'最终状态' -eq "高优先级异动" }).Count
+            "当期高优先异动" = @($_.Group | Where-Object { $_.'高优先级类型' -eq "当期高优先异动" }).Count
+            "缓慢高优先异动" = @($_.Group | Where-Object { $_.'高优先级类型' -eq "缓慢高优先异动" }).Count
             "待复核异动" = @($_.Group | Where-Object { $_.'最终状态' -eq "待复核异动" }).Count
         }
     } |
@@ -97,11 +100,18 @@ if (Test-Path -LiteralPath $DiagnosisIndexPath) {
             "父ASIN" = Get-FieldValue $_ @("父ASIN", "parent_asin", "asin")
             "商品名" = Get-FieldValue $_ @("商品名", "product_name")
             "异动指标" = Get-FieldValue $_ @("异动指标", "metric_type")
+            "高优先级类型" = Get-FieldValue $_ @("高优先级类型", "high_priority_type")
             "诊断状态" = Get-FieldValue $_ @("诊断状态", "diagnosis_status")
+            "核心诊断状态" = Get-FieldValue $_ @("核心诊断状态", "core_diagnosis_status")
+            "可发送状态" = Get-FieldValue $_ @("可发送状态", "send_status")
             "报告类型" = Get-FieldValue $_ @("报告类型", "report_type")
             "摘要页地址" = Get-FieldValue $_ @("摘要页地址", "summary_page_path", "summary_url", "报告地址")
             "Word报告地址" = Get-FieldValue $_ @("Word报告地址", "word_report_path", "docx_path")
+            "证据缺口类型" = Get-FieldValue $_ @("证据缺口类型", "evidence_gap_type")
+            "证据缺口说明" = Get-FieldValue $_ @("证据缺口说明", "evidence_gap_detail")
+            "字段映射记录" = Get-FieldValue $_ @("字段映射记录", "field_mapping_log")
             "失败原因" = Get-FieldValue $_ @("失败原因", "failure_reason")
+            "阻断原因" = Get-FieldValue $_ @("阻断原因", "blocking_reason")
         }
     })
 } else {
@@ -113,11 +123,18 @@ if (Test-Path -LiteralPath $DiagnosisIndexPath) {
             "父ASIN" = $_.'父ASIN'
             "商品名" = $_.'商品名'
             "异动指标" = $_.'异动指标'
+            "高优先级类型" = $_.'高优先级类型'
             "诊断状态" = "未生成"
+            "核心诊断状态" = "未生成"
+            "可发送状态" = "禁止发送"
             "报告类型" = Get-DiagnosisReportType $_.'异动指标'
             "摘要页地址" = ""
             "Word报告地址" = ""
+            "证据缺口类型" = ""
+            "证据缺口说明" = ""
+            "字段映射记录" = ""
             "失败原因" = ""
+            "阻断原因" = "未生成诊断报告"
         }
     })
 }
@@ -251,6 +268,7 @@ select option { color:#111827; background:#ffffff; }
 }
 .kpi .value { font-size:38px; line-height:1; font-weight:800; }
 .kpi .label { margin-top:10px; font-size:16px; }
+.kpi .subvalue { margin-top:6px; font-size:11px; line-height:1.35; opacity:.92; }
 .visual-grid {
   margin-top:46px;
   display:grid;
@@ -406,7 +424,7 @@ tr:hover, tr.selected { background:rgba(255,255,255,.16); }
       <div class="select-box"><label>负责人</label><select id="ownerFilter"><option value="">全部负责人</option>__OWNER_OPTIONS__</select></div>
     </div>
     <div class="tile kpi"><div class="value" id="totalCard">__TOTAL__</div><div class="label">异动商品数</div></div>
-    <div class="tile kpi"><div class="value" id="highCard">__HIGH__</div><div class="label">高优先级异动</div></div>
+    <div class="tile kpi"><div class="value" id="highCard">__HIGH__</div><div class="label">高优先级异动</div><div class="subvalue" id="highSubtypeCard">当期 0 / 缓慢 0</div></div>
     <div class="tile kpi"><div class="value" id="reviewCard">__REVIEW__</div><div class="label">待复核异动</div></div>
   </section>
 
@@ -441,9 +459,9 @@ tr:hover, tr.selected { background:rgba(255,255,255,.16); }
         </div>
         <input id="searchBox" placeholder="搜索父ASIN / 商品名">
       </div>
-      <div class="table-wrap" style="margin-bottom:10px;"><table id="summaryTable"><thead><tr><th>站点</th><th>店铺</th><th>负责人</th><th class="num">异动商品数</th><th class="num">高优先级异动</th><th class="num">待复核异动</th></tr></thead><tbody></tbody></table></div>
+      <div class="table-wrap" style="margin-bottom:10px;"><table id="summaryTable"><thead><tr><th>站点</th><th>店铺</th><th>负责人</th><th class="num">异动商品数</th><th class="num">高优先级异动</th><th class="num">当期高优先异动</th><th class="num">缓慢高优先异动</th><th class="num">待复核异动</th></tr></thead><tbody></tbody></table></div>
       <div class="detail-title" id="detailTitle">当前显示全部明细</div>
-      <div class="table-wrap"><table id="detailTable"><thead><tr><th>站点</th><th>店铺</th><th>负责人</th><th>父ASIN</th><th class="product">商品名</th><th>异动指标</th><th>当前值</th><th>上月值</th><th>变化率</th><th>异动识别方式</th><th>趋势候选原因</th><th>趋势判断窗口</th><th>历史判断</th><th>待复核原因</th><th>最终状态</th></tr></thead><tbody></tbody></table></div>
+      <div class="table-wrap"><table id="detailTable"><thead><tr><th>站点</th><th>店铺</th><th>负责人</th><th>父ASIN</th><th class="product">商品名</th><th>异动指标</th><th>当前值</th><th>上月值</th><th>变化率</th><th>异动识别方式</th><th>趋势候选原因</th><th>趋势判断窗口</th><th>历史判断</th><th>待复核原因</th><th>最终状态</th><th>高优先级类型</th></tr></thead><tbody></tbody></table></div>
     </div>
   </section>
 </main>
@@ -463,6 +481,7 @@ const storeFilter = document.getElementById("storeFilter");
 const ownerFilter = document.getElementById("ownerFilter");
 const totalCard = document.getElementById("totalCard");
 const highCard = document.getElementById("highCard");
+const highSubtypeCard = document.getElementById("highSubtypeCard");
 const reviewCard = document.getElementById("reviewCard");
 const siteBars = document.getElementById("siteBars");
 const ownerHighBars = document.getElementById("ownerHighBars");
@@ -526,7 +545,7 @@ function filteredDiagnosisReports() {
     if (selectedKey && rowKey(row) !== selectedKey) return false;
     if (selectedStatus && selectedStatus !== "高优先级异动") return false;
     if (!q) return true;
-    const haystack = [row["父ASIN"], row["商品名"], row["异动指标"], row["诊断状态"], row["报告类型"]].join(" ").toLowerCase();
+    const haystack = [row["父ASIN"], row["商品名"], row["异动指标"], row["诊断状态"], row["核心诊断状态"], row["可发送状态"], row["证据缺口类型"], row["报告类型"]].join(" ").toLowerCase();
     return haystack.includes(q);
   });
 }
@@ -568,6 +587,7 @@ function renderCards() {
   const rows = filteredSummaryRows();
   totalCard.textContent = rows.reduce((s,row) => s + Number(row["异动商品数"] || 0), 0);
   highCard.textContent = rows.reduce((s,row) => s + Number(row["高优先级异动"] || 0), 0);
+  highSubtypeCard.textContent = `当期 ${rows.reduce((s,row) => s + Number(row["当期高优先异动"] || 0), 0)} / 缓慢 ${rows.reduce((s,row) => s + Number(row["缓慢高优先异动"] || 0), 0)}`;
   reviewCard.textContent = rows.reduce((s,row) => s + Number(row["待复核异动"] || 0), 0);
 }
 function renderBars(el, rows, valueField, limit = 6) {
@@ -606,11 +626,15 @@ function renderDiagnosisReports() {
   diagnosisList.innerHTML = rows.map(row => {
     const href = row["摘要页地址"] || row["Word报告地址"] || "";
     const action = href ? `<a href="${esc(href)}" target="_blank" rel="noopener">查看报告</a>` : `<span class="pending">待生成</span>`;
-    const reason = row["失败原因"] ? `｜${row["失败原因"]}` : "";
+    const diagnosisState = row["核心诊断状态"] || row["诊断状态"] || "未生成";
+    const sendState = row["可发送状态"] ? `｜${row["可发送状态"]}` : "";
+    const gap = row["证据缺口类型"] ? `｜证据缺口：${row["证据缺口类型"]}` : "";
+    const reasonText = row["阻断原因"] || row["失败原因"] || "";
+    const reason = reasonText ? `｜${reasonText}` : "";
     return `<div class="report-card">
       <div class="asin">${esc(row["父ASIN"])}</div>
       <div class="meta">${esc(row["商品名"])}</div>
-      <div class="meta">${esc(row["异动指标"])}｜${esc(row["报告类型"])}｜${esc(row["诊断状态"] || "未生成")}${esc(reason)}</div>
+      <div class="meta">${esc(row["异动指标"])}｜${esc(row["高优先级类型"] || "高优先级异动")}｜${esc(row["报告类型"])}｜${esc(diagnosisState)}${esc(sendState)}${esc(gap)}${esc(reason)}</div>
       ${action}
     </div>`;
   }).join("");
@@ -685,6 +709,8 @@ function renderSummary() {
       <td>${esc(row["站点"])}</td><td>${esc(row["店铺"])}</td><td>${esc(row["负责人"])}</td>
       <td class="num link" data-scope="all">${esc(row["异动商品数"])}</td>
       <td class="num link status-high" data-scope="高优先级异动">${esc(row["高优先级异动"])}</td>
+      <td class="num link status-high" data-scope="高优先级异动">${esc(row["当期高优先异动"] || 0)}</td>
+      <td class="num link status-high" data-scope="高优先级异动">${esc(row["缓慢高优先异动"] || 0)}</td>
       <td class="num link status-review" data-scope="待复核异动">${esc(row["待复核异动"])}</td>
     </tr>`;
   }).join("");
@@ -701,7 +727,7 @@ function renderDetails() {
   detailTable.querySelector("tbody").innerHTML = rows.map(row => `<tr>
     <td>${esc(row["站点"])}</td><td>${esc(row["店铺"])}</td><td>${esc(row["负责人"])}</td><td>${esc(row["父ASIN"])}</td>
     <td>${esc(row["商品名"])}</td><td>${esc(row["异动指标"])}</td><td>${esc(row["当前值"])}</td><td>${esc(row["上月值"])}</td>
-    <td>${esc(row["变化率"])}</td><td>${esc(row["异动识别方式"])}</td><td>${esc(row["趋势候选原因"])}</td><td>${esc(row["趋势判断窗口"])}</td><td>${esc(row["历史判断"])}</td><td>${esc(reviewReason(row))}</td><td class="${row["最终状态"] === "高优先级异动" ? "status-high" : "status-review"}">${esc(row["最终状态"])}</td>
+    <td>${esc(row["变化率"])}</td><td>${esc(row["异动识别方式"])}</td><td>${esc(row["趋势候选原因"])}</td><td>${esc(row["趋势判断窗口"])}</td><td>${esc(row["历史判断"])}</td><td>${esc(reviewReason(row))}</td><td class="${row["最终状态"] === "高优先级异动" ? "status-high" : "status-review"}">${esc(row["最终状态"])}</td><td>${esc(row["高优先级类型"])}</td>
   </tr>`).join("");
 }
 function renderReviewDetails() {
