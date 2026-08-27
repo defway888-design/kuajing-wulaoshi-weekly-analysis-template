@@ -85,10 +85,30 @@ Run the workflow directly in Codex.
 
 Do not assume Windows Task Scheduler, a server, GitHub Actions, or a third-party scheduler unless the user explicitly changes the runtime.
 
-GitHub private template repository:
+GitHub public template repository:
 
 ```text
 https://github.com/defway888-design/kuajing-wulaoshi-weekly-analysis-template
+```
+
+Do not require users to submit a GitHub username or accept a private-repository invitation for the standard installation flow.
+
+Do not depend on a fixed local path such as:
+
+```text
+C:\Users\20085\
+```
+
+For local user paths, use the Codex default installation mechanism or resolve the current Windows user directory dynamically:
+
+```powershell
+$env:USERPROFILE
+```
+
+When writing user-facing docs, show local examples as:
+
+```text
+C:\Users\<your-windows-user-name>\...
 ```
 
 Default runtime mode:

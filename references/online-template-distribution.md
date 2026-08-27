@@ -34,9 +34,9 @@ version metadata
 
 ## Recommended Repository
 
-Use a private GitHub repository as the online template source.
+Use a public GitHub repository as the online template source for the standard version.
 
-The final repository URL may be TBD during drafting. Keep it as a placeholder until the user provides the actual URL.
+Do not require users to provide GitHub usernames or accept private repository invitations for the standard installation flow.
 
 ```text
 kuajing-wulaoshi-weekly-analysis-template/
@@ -64,8 +64,17 @@ Codex runtime config supplies:
   "template_manifest_url": "https://raw.githubusercontent.com/defway888-design/kuajing-wulaoshi-weekly-analysis-template/main/template_manifest.json",
   "lingxing_mcp_url": "https://openmcp.lingxing.com/mcp-servers/lingxing-mcp",
   "lingxing_mcp_key": "<secret>",
-  "output_dir": "D:\\lingxing_weekly_output"
+  "output_dir": "<runtime-local-output-directory>"
 }
+```
+
+Local path policy:
+
+```text
+do not hard-code C:\Users\20085\ or any other single user's path
+use Codex default installation paths
+use $env:USERPROFILE when a Windows user directory must be resolved
+write documentation examples as C:\Users\<your-windows-user-name>\...
 ```
 
 ## Template Manifest
@@ -114,7 +123,7 @@ field/rule change -> major
 ```text
 1. run in Codex
 2. read runtime config
-3. download template_manifest.json from the GitHub private template repository
+3. download template_manifest.json from the GitHub public template repository
 4. download rules, schemas, templates, renderer
 5. call LingXing MCP
 6. calculate anomalies with online rules
@@ -140,4 +149,4 @@ standard email send time: Monday 09:00
 late-send rule: send immediately after processing and validation succeed
 ```
 
-Do not include business data, MCP keys, sender credentials, boss email, owner emails, or generated reports in the GitHub private template repository.
+Do not include business data, MCP keys, sender credentials, boss email, owner emails, or generated reports in the GitHub public template repository.

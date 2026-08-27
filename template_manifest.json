@@ -1,6 +1,6 @@
 {
   "template_name": "kuajing-wulaoshi-weekly-analysis",
-  "template_version": "1.6.0",
+  "template_version": "1.6.1",
   "rules_version": "weekly-parent-asin-anomaly-v1.6",
   "schema_version": "weekly-bi-output-v1.6",
   "style_version": "manager-and-owner-bi-v1.6",
@@ -11,6 +11,8 @@
   "runtime": "Codex",
   "default_mode": "trial",
   "template_repository_url": "https://github.com/defway888-design/kuajing-wulaoshi-weekly-analysis-template",
+  "template_repository_visibility": "public",
+  "local_path_policy": "Use Codex default installation or $env:USERPROFILE. Do not hard-code C:\\Users\\20085\\ or any single-user path.",
   "files": {
     "skill": "SKILL.md",
     "business_spec": "references/business-spec.md",

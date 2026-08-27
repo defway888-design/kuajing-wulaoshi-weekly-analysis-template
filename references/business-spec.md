@@ -21,10 +21,21 @@ query_product_performance_asin_lists
 
 Run the workflow directly in Codex.
 
-GitHub private template repository:
+GitHub public template repository:
 
 ```text
 https://github.com/defway888-design/kuajing-wulaoshi-weekly-analysis-template
+```
+
+Standard installation does not require collecting user GitHub names or sending private-repository invitations.
+
+Local path policy:
+
+```text
+do not hard-code C:\Users\20085\ or any other single-user path
+use Codex default skill installation
+use $env:USERPROFILE when a Windows user directory is required
+write docs as C:\Users\<your-windows-user-name>\...
 ```
 
 Default mode:
