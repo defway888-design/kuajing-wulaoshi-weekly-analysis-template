@@ -8,6 +8,8 @@ $ErrorActionPreference = "Stop"
 $SummaryPath = Join-Path $OutputDir "负责人汇总表_优先级命名.csv"
 $DetailPath = Join-Path $OutputDir "异动明细表_优先级命名.csv"
 $DiagnosisIndexPath = Join-Path $OutputDir "高优先级ASIN诊断报告索引.csv"
+$ActionAuditPath = Join-Path $OutputDir "系统行动建议审计快照.csv"
+$DeliveryStatusPath = Join-Path $OutputDir "负责人在线表格投递状态.csv"
 $Errors = [System.Collections.Generic.List[string]]::new()
 
 function Add-Error([string]$Message) {
@@ -46,7 +48,7 @@ if ($Errors.Count -eq 0) {
     $Details = @(Import-Csv -LiteralPath $DetailPath)
 
     Require-Columns $Summary @("站点", "店铺", "负责人", "异动商品数", "高优先级异动", "当期高优先异动", "缓慢高优先异动", "待复核异动") "负责人汇总表"
-    Require-Columns $Details @("站点", "店铺", "负责人", "父ASIN", "商品名", "异动指标", "当前值", "上月值", "变化率", "异动识别方式", "趋势候选原因", "趋势判断窗口", "历史判断", "待复核原因", "最终状态", "高优先级类型") "异动明细表"
+    Require-Columns $Details @("站点", "店铺", "负责人", "父ASIN", "商品名", "异动指标", "异动来源", "当前比较窗口", "基准比较窗口", "当前流量值", "基准流量值", "流量变化率", "当前转化率", "基准转化率", "转化率变化率", "异动识别方式", "趋势候选原因", "趋势判断窗口", "历史判断", "待复核原因", "最终状态", "高优先级类型") "异动明细表"
 
     $SummaryTotal = 0
     foreach ($Row in $Summary) {
@@ -72,7 +74,21 @@ if ($Errors.Count -eq 0) {
     $AllowedDetectionModes = @("单周期异动", "30天双窗口趋势异动", "单周期+30天双窗口趋势异动")
     $AllowedTrendReasons = @("", "流量接近阈值", "转化率接近阈值", "流量+转化率同时接近阈值")
     $AllowedHighPriorityTypes = @("", "当期高优先异动", "缓慢高优先异动")
+    $AllowedMetricTypes = @("流量异动", "转化率异动", "流量+转化率异动")
     foreach ($Row in $Details) {
+        if ($AllowedMetricTypes -notcontains $Row.'异动指标') {
+            Add-Error "明细表存在非法异动指标：$($Row.'异动指标')"
+        }
+        foreach ($WindowField in @("异动来源", "当前比较窗口", "基准比较窗口")) {
+            if ([string]::IsNullOrWhiteSpace([string]$Row.$WindowField)) {
+                Add-Error "明细表缺少$WindowField：$($Row.'父ASIN')"
+            }
+        }
+        foreach ($Field in @("当前流量值", "基准流量值", "流量变化率", "当前转化率", "基准转化率", "转化率变化率")) {
+            if ([string]::IsNullOrWhiteSpace([string]$Row.$Field)) {
+                Add-Error "明细表缺少$Field：$($Row.'父ASIN')"
+            }
+        }
         if ($AllowedStatuses -notcontains $Row.'最终状态') {
             Add-Error "明细表存在非法最终状态：$($Row.'最终状态')"
         }
@@ -117,13 +133,14 @@ if ($Errors.Count -eq 0) {
 
     if (Test-Path -LiteralPath $DiagnosisIndexPath) {
         $DiagnosisRows = @(Import-Csv -LiteralPath $DiagnosisIndexPath)
-        Require-Columns $DiagnosisRows @("站点", "店铺", "负责人", "父ASIN", "商品名", "异动指标", "高优先级类型", "诊断状态", "核心诊断状态", "可发送状态", "报告类型", "摘要页地址", "Word报告地址", "证据缺口类型", "证据缺口说明", "字段映射记录", "失败原因", "阻断原因") "高优先级ASIN诊断报告索引"
+        Require-Columns $DiagnosisRows @("站点", "店铺", "负责人", "父ASIN", "商品名", "异动指标", "高优先级类型", "异动来源", "当前比较窗口", "基准比较窗口", "当前流量值", "基准流量值", "流量变化率", "当前转化率", "基准转化率", "转化率变化率", "诊断状态", "核心诊断状态", "可发送状态", "报告类型", "摘要页地址", "Word报告地址", "证据缺口类型", "证据缺口说明", "字段映射记录", "失败原因", "阻断原因", "行动方案状态", "在线表格写入状态", "在线表格地址") "高优先级ASIN诊断报告索引"
         if ($HighPriorityDetailCount -gt 0 -and $DiagnosisRows.Count -lt $HighPriorityDetailCount) {
             Add-Error "高优先级诊断索引行数少于高优先级明细行数"
         }
         $AllowedDiagnosisStatuses = @("已完成", "部分完成", "诊断失败", "未生成")
         $AllowedCoreDiagnosisStatuses = @("完整完成", "可用但有证据缺口", "阻断失败", "未生成")
         $AllowedSendStatuses = @("允许发送", "禁止发送")
+        $AllowedActionStatuses = @("正式行动方案", "待复核观察")
         foreach ($Row in $DiagnosisRows) {
             if ($AllowedHighPriorityTypes -notcontains $Row.'高优先级类型' -or [string]::IsNullOrWhiteSpace($Row.'高优先级类型')) {
                 Add-Error "诊断索引存在非法高优先级类型：$($Row.'高优先级类型')"
@@ -136,6 +153,14 @@ if ($Errors.Count -eq 0) {
             }
             if ($AllowedSendStatuses -notcontains $Row.'可发送状态') {
                 Add-Error "诊断索引存在非法可发送状态：$($Row.'可发送状态')"
+            }
+            if ($AllowedActionStatuses -notcontains $Row.'行动方案状态') {
+                Add-Error "诊断索引存在非法行动方案状态：$($Row.'行动方案状态')"
+            }
+            foreach ($Field in @("异动来源", "当前比较窗口", "基准比较窗口", "当前流量值", "基准流量值", "流量变化率", "当前转化率", "基准转化率", "转化率变化率")) {
+                if ([string]::IsNullOrWhiteSpace([string]$Row.$Field)) {
+                    Add-Error "诊断索引缺少$Field：$($Row.'父ASIN')"
+                }
             }
             if ($Row.'核心诊断状态' -in @("完整完成", "可用但有证据缺口") -and $Row.'可发送状态' -ne "允许发送") {
                 Add-Error "诊断索引发送状态错误：$($Row.'父ASIN') 核心诊断状态为 $($Row.'核心诊断状态') 时应允许发送"
@@ -156,6 +181,73 @@ if ($Errors.Count -eq 0) {
                     Add-Error "诊断索引链接不能使用本机绝对路径：$PathField=$PathValue"
                 }
             }
+        }
+    }
+
+    if (-not (Test-Path -LiteralPath $ActionAuditPath)) {
+        Add-Error "缺少系统行动建议审计快照：$ActionAuditPath"
+    } else {
+        $ActionRows = @(Import-Csv -LiteralPath $ActionAuditPath)
+        $ActionColumns = @(
+            "记录键", "报告周期", "负责人", "父ASIN", "异动指标", "行动方案类型", "证据摘要", "可控制因素", "可执行动作",
+            "不可控制因素", "观察记录", "P0建议动作", "P1建议动作", "规则版本", "批次版本", "内容哈希", "异动来源", "当前比较窗口",
+            "基准比较窗口", "当前流量值", "基准流量值", "流量变化率", "当前转化率", "基准转化率", "转化率变化率", "后续复核指标",
+            "评价基准值", "预期改善方向", "建议评价时间", "评价口径说明", "在线记录哈希", "批次聚合哈希"
+        )
+        Require-Columns $ActionRows $ActionColumns "系统行动建议审计快照"
+        if ($ActionRows.Count -ne $Details.Count) {
+            Add-Error "系统行动建议行数 $($ActionRows.Count) 与异动明细行数 $($Details.Count) 不一致"
+        }
+        $DuplicateKeys = @($ActionRows | Group-Object "记录键" | Where-Object { $_.Count -gt 1 })
+        foreach ($Duplicate in $DuplicateKeys) {
+            Add-Error "系统行动建议存在重复记录键：$($Duplicate.Name)"
+        }
+        foreach ($Row in $ActionRows) {
+            foreach ($Field in @("记录键", "报告周期", "负责人", "父ASIN", "异动指标", "行动方案类型", "规则版本", "批次版本", "内容哈希", "异动来源", "当前比较窗口", "基准比较窗口", "当前流量值", "基准流量值", "流量变化率", "当前转化率", "基准转化率", "转化率变化率", "在线记录哈希", "批次聚合哈希")) {
+                if ([string]::IsNullOrWhiteSpace([string]$Row.$Field)) {
+                    Add-Error "系统行动建议缺少$Field：$($Row.'父ASIN')"
+                }
+            }
+            if ($Row.'行动方案类型' -eq "正式行动方案") {
+                foreach ($Field in @("证据摘要", "可控制因素", "可执行动作", "后续复核指标", "评价基准值", "预期改善方向", "建议评价时间", "评价口径说明")) {
+                    if ([string]::IsNullOrWhiteSpace([string]$Row.$Field)) {
+                        Add-Error "正式行动方案缺少$Field：$($Row.'父ASIN')"
+                    }
+                }
+                if ([string]::IsNullOrWhiteSpace([string]$Row.'P0建议动作') -and [string]::IsNullOrWhiteSpace([string]$Row.'P1建议动作')) {
+                    Add-Error "正式行动方案至少需要一项P0或P1建议：$($Row.'父ASIN')"
+                }
+            } elseif ($Row.'行动方案类型' -eq "待复核观察") {
+                foreach ($Field in @("可控制因素", "可执行动作", "P0建议动作", "P1建议动作")) {
+                    if (-not [string]::IsNullOrWhiteSpace([string]$Row.$Field)) {
+                        Add-Error "待复核观察不得填写$Field：$($Row.'父ASIN')"
+                    }
+                }
+                foreach ($Field in @("后续复核指标", "建议评价时间", "评价口径说明")) {
+                    if ([string]::IsNullOrWhiteSpace([string]$Row.$Field)) {
+                        Add-Error "待复核观察缺少$Field：$($Row.'父ASIN')"
+                    }
+                }
+            } else {
+                Add-Error "系统行动建议存在非法行动方案类型：$($Row.'行动方案类型')"
+            }
+        }
+    }
+
+    if (-not (Test-Path -LiteralPath $DeliveryStatusPath)) {
+        Add-Error "缺少负责人在线表格投递状态：$DeliveryStatusPath"
+    } else {
+        $DeliveryRows = @(Import-Csv -LiteralPath $DeliveryStatusPath)
+        Require-Columns $DeliveryRows @("报告周期", "站点", "店铺", "负责人", "收件邮箱", "在线表格地址", "平台", "MCP连接状态", "授权状态", "写入状态", "回读状态", "重试次数", "失败原因", "邮件发送状态", "最新验证时间") "负责人在线表格投递状态"
+        $ExpectedOwners = @($Details | Select-Object -ExpandProperty "负责人" -Unique)
+        $ActualOwners = @($DeliveryRows | Select-Object -ExpandProperty "负责人" -Unique)
+        foreach ($Owner in $ExpectedOwners) {
+            if ($ActualOwners -notcontains $Owner) {
+                Add-Error "负责人在线表格投递状态缺少负责人：$Owner"
+            }
+        }
+        foreach ($Duplicate in @($DeliveryRows | Group-Object "负责人" | Where-Object { $_.Count -gt 1 })) {
+            Add-Error "负责人在线表格投递状态存在重复负责人：$($Duplicate.Name)"
         }
     }
 

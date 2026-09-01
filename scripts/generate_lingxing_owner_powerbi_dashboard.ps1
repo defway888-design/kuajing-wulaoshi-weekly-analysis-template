@@ -40,6 +40,9 @@ if (-not $TemplateNeedsRefresh) {
     if (-not $TemplateNeedsRefresh) {
         $TemplateNeedsRefresh = -not $ExistingTemplate.Contains("可发送状态")
     }
+    if (-not $TemplateNeedsRefresh) {
+        $TemplateNeedsRefresh = -not $ExistingTemplate.Contains("当前流量值")
+    }
 }
 if ($TemplateNeedsRefresh) {
     $RendererCode = Get-Content -LiteralPath (Join-Path $ScriptDir "generate_lingxing_powerbi_style_dashboard.ps1") -Raw -Encoding UTF8
@@ -99,6 +102,15 @@ if (Test-Path -LiteralPath $DiagnosisIndexPath) {
             "商品名" = Get-FieldValue $_ @("商品名", "product_name")
             "异动指标" = Get-FieldValue $_ @("异动指标", "metric_type")
             "高优先级类型" = Get-FieldValue $_ @("高优先级类型", "high_priority_type")
+            "异动来源" = Get-FieldValue $_ @("异动来源", "异动识别方式", "anomaly_source", "detection_mode")
+            "当前比较窗口" = Get-FieldValue $_ @("当前比较窗口", "current_window")
+            "基准比较窗口" = Get-FieldValue $_ @("基准比较窗口", "baseline_window", "previous_window")
+            "当前流量值" = Get-FieldValue $_ @("当前流量值", "current_traffic")
+            "基准流量值" = Get-FieldValue $_ @("基准流量值", "baseline_traffic", "previous_traffic")
+            "流量变化率" = Get-FieldValue $_ @("流量变化率", "traffic_change_rate")
+            "当前转化率" = Get-FieldValue $_ @("当前转化率", "current_conversion_rate")
+            "基准转化率" = Get-FieldValue $_ @("基准转化率", "baseline_conversion_rate", "previous_conversion_rate")
+            "转化率变化率" = Get-FieldValue $_ @("转化率变化率", "conversion_change_rate")
             "诊断状态" = Get-FieldValue $_ @("诊断状态", "diagnosis_status")
             "核心诊断状态" = Get-FieldValue $_ @("核心诊断状态", "core_diagnosis_status")
             "可发送状态" = Get-FieldValue $_ @("可发送状态", "send_status")
@@ -110,6 +122,9 @@ if (Test-Path -LiteralPath $DiagnosisIndexPath) {
             "字段映射记录" = Get-FieldValue $_ @("字段映射记录", "field_mapping_log")
             "失败原因" = Get-FieldValue $_ @("失败原因", "failure_reason")
             "阻断原因" = Get-FieldValue $_ @("阻断原因", "blocking_reason")
+            "行动方案状态" = Get-FieldValue $_ @("行动方案状态", "action_plan_status")
+            "在线表格写入状态" = Get-FieldValue $_ @("在线表格写入状态", "online_table_write_status")
+            "在线表格地址" = Get-FieldValue $_ @("在线表格地址", "online_table_url")
         }
     })
 } else {
@@ -122,6 +137,15 @@ if (Test-Path -LiteralPath $DiagnosisIndexPath) {
             "商品名" = $_.'商品名'
             "异动指标" = $_.'异动指标'
             "高优先级类型" = $_.'高优先级类型'
+            "异动来源" = $_.'异动来源'
+            "当前比较窗口" = $_.'当前比较窗口'
+            "基准比较窗口" = $_.'基准比较窗口'
+            "当前流量值" = $_.'当前流量值'
+            "基准流量值" = $_.'基准流量值'
+            "流量变化率" = $_.'流量变化率'
+            "当前转化率" = $_.'当前转化率'
+            "基准转化率" = $_.'基准转化率'
+            "转化率变化率" = $_.'转化率变化率'
             "诊断状态" = "未生成"
             "核心诊断状态" = "未生成"
             "可发送状态" = "禁止发送"
@@ -133,6 +157,9 @@ if (Test-Path -LiteralPath $DiagnosisIndexPath) {
             "字段映射记录" = ""
             "失败原因" = ""
             "阻断原因" = "未生成诊断报告"
+            "行动方案状态" = "待复核观察"
+            "在线表格写入状态" = "未写入"
+            "在线表格地址" = ""
         }
     })
 }

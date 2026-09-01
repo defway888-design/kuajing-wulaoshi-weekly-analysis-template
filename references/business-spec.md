@@ -2,6 +2,16 @@
 
 Source of truth summary for the 跨境吴老师 weekly BI workflow.
 
+The following extension contracts are authoritative for diagnosis integration, system action suggestions, and owner online-table delivery:
+
+```text
+references/diagnosis-integration-contract.md
+references/action-plan-contract.md
+references/online-table-delivery.md
+```
+
+If older wording in this specification conflicts with one of those contracts, use the corresponding extension contract.
+
 ## Data Source
 
 Use LingXing MCP over HTTPS:
@@ -113,9 +123,9 @@ Core fields are blocking because they are required to calculate the anomaly:
 店铺
 父ASIN
 当前周期流量
-当前周期订单量
+当前周期成交量（volume）
 上月周期流量
-上月周期订单量
+上月周期成交量（volume）
 周期天数
 当前周期日期范围
 上月周期日期范围
@@ -150,7 +160,7 @@ Default mapping table:
 | SKU | seller_sku | msku, sku | no |
 | Seller ID | seller_id | sid, sellerId | no |
 | 流量 | sessions | sessions_total, traffic | yes |
-| 订单量 | order_count | volume, sales, units_ordered | yes |
+| 成交量 | volume | order_count, sales, units_ordered | yes |
 | 商品名 | product_name | title, item_name | no |
 | 负责人 | owner | principal_name, principal_names | no |
 | 主图 | main_image | image, image_url | no |
@@ -359,6 +369,8 @@ history explains movement -> exclude from output
 
 ## High-Priority ASIN Diagnosis
 
+Follow `references/diagnosis-integration-contract.md`. The main Skill must pass the complete anomaly context to the selected diagnosis Skill and receive the Word report plus the same-run structured evidence object. Do not parse the Word report to reconstruct evidence.
+
 Only rows with:
 
 ```text
@@ -400,6 +412,15 @@ Required diagnosis index columns:
 商品名
 异动指标
 高优先级类型
+异动来源
+当前比较窗口
+基准比较窗口
+当前流量值
+基准流量值
+流量变化率
+当前转化率
+基准转化率
+转化率变化率
 诊断状态
 核心诊断状态
 可发送状态
@@ -411,6 +432,9 @@ Word报告地址
 字段映射记录
 失败原因
 阻断原因
+行动方案状态
+在线表格写入状态
+在线表格地址
 ```
 
 Allowed `诊断状态` values:
@@ -447,9 +471,37 @@ Diagnosis send rules:
 未生成 -> 禁止发送
 ```
 
-If diagnosis fails because a required core input or diagnosis Skill call is unavailable, keep the ASIN in the index with `核心诊断状态 = 阻断失败`, `可发送状态 = 禁止发送`, and `阻断原因`. Do not fabricate report content.
+If diagnosis fails because a required core input or diagnosis Skill call is unavailable, keep the ASIN in the index with `核心诊断状态 = 阻断失败`, `可发送状态 = 禁止发送`, and `阻断原因`. Do not fabricate report content. Create only a `待复核观察` action row for that ASIN and continue processing other ASINs, other owners, and the boss package; an individual diagnosis failure is not a global batch blocker.
 
 If only auxiliary evidence is missing, keep the ASIN sendable and record `证据缺口类型` and `证据缺口说明`.
+
+`可发送状态` controls only the diagnosis attachment. It does not decide whether the owner's detail table, BI, verified online-table link, or other completed records may be sent.
+
+## System Action Suggestions
+
+Follow `references/action-plan-contract.md`.
+
+The weekly main Skill is the only owner of system action-suggestion generation. Generate one action item per anomaly record key; keep `流量+转化率异动` as one project. The fixed reasoning sequence is:
+
+```text
+异动事实
+-> 证据摘要
+-> 可控制因素
+-> 可执行动作
+-> 不可控制因素
+-> 观察记录
+-> P0/P1建议
+```
+
+Use `正式行动方案` only when diagnosis evidence supports a concrete controllable action. Otherwise generate `待复核观察` with evidence gaps and review requirements, without fabricating P0/P1 actions. System fields are read-only and must carry the record key, rule version, batch version, content hash, online-record hash, and batch aggregate hash.
+
+## Owner Online Action Tables
+
+Follow `references/online-table-delivery.md`.
+
+Every current owner with at least one anomaly row, including owners who only have review anomalies, must have a unique online-table link. Detect Feishu, Tencent Docs, Google Sheets, Excel Online, or WPS from the submitted link, then verify the matching MCP authorization, write capability, and readback capability. A browser-simulation fallback is forbidden.
+
+Write formal actions and review-observation rows to the owner's long-term table, verify by readback, and isolate platform/write failures to the affected owner. Shared ASINs are written to every responsible owner's table. Never overwrite operator-entered final-plan fields.
 
 ## Output Tables
 
@@ -482,9 +534,15 @@ If only auxiliary evidence is missing, keep the ASIN sendable and record `证据
 父ASIN
 商品名
 异动指标
-当前值
-上月值
-变化率
+异动来源
+当前比较窗口
+基准比较窗口
+当前流量值
+基准流量值
+流量变化率
+当前转化率
+基准转化率
+转化率变化率
 异动识别方式
 趋势候选原因
 趋势判断窗口
@@ -582,9 +640,9 @@ Boss package:
 
 ```text
 default: one complete zip package
-complete package: 负责人BI + summary/detail tables + diagnosis index + ASIN summary pages + Word reports
+complete package: 负责人BI + summary/detail tables + diagnosis index + ASIN summary pages + Word reports + 系统行动建议审计快照.csv + 负责人在线表格投递状态.csv
 if the complete package exceeds the sender-provider usable threshold: send a light package
-light package: 负责人BI + summary/detail tables + diagnosis index + ASIN summary pages, without full Word reports
+light package: 负责人BI + summary/detail tables + diagnosis index + ASIN summary pages + action audit snapshot + owner online-table delivery status, without full Word reports
 ```
 
 Boss BI report links must use relative paths inside the zip package and open ASIN diagnosis summary pages.
@@ -595,8 +653,11 @@ Owner recipients:
 detected from current LingXing owner data
 missing owner emails are prompted during the Codex run
 each owner receives only their own 异动明细表 and 异动明细BI
-each owner also receives their own high-priority ASIN Word diagnosis reports
+each owner receives their verified online action-table link and writeback status
+each owner also receives only their own sendable high-priority ASIN Word diagnosis reports
 ```
+
+Do not attach `行动方案建议表_<负责人>.csv`. The online table is the action-plan delivery surface.
 
 Owner diagnosis attachments:
 

@@ -2,6 +2,8 @@
 
 Use this reference when adding deep diagnosis, Word reports, BI report links, and email packaging for high-priority anomalies.
 
+For the current standard, read `diagnosis-integration-contract.md`, `action-plan-contract.md`, and `online-table-delivery.md` together with this file. Their action, table and failure-isolation rules take precedence where this file is older.
+
 ## Trigger
 
 Run deep diagnosis only for rows where:
@@ -101,6 +103,18 @@ Word报告地址
 字段映射记录
 失败原因
 阻断原因
+异动来源
+当前比较窗口
+基准比较窗口
+当前流量值
+基准流量值
+流量变化率
+当前转化率
+基准转化率
+转化率变化率
+行动方案状态
+在线表格写入状态
+在线表格地址
 ```
 
 Allowed `诊断状态` values:
@@ -189,6 +203,8 @@ Complete package includes:
 高优先级ASIN诊断报告索引.csv
 ASIN diagnosis summary pages
 full Word diagnosis reports
+system action-suggestion audit snapshot
+owner online-table links and write states
 ```
 
 Light package includes:
@@ -228,6 +244,7 @@ Each owner receives only their own data:
 owner-specific 异动明细表
 owner-specific 异动明细BI
 owner-specific high-priority ASIN Word diagnosis reports
+owner online action-table link and write/readback status
 ```
 
 Attachment rule:
@@ -294,13 +311,16 @@ set 可发送状态 = 禁止发送
 write 失败原因 and 阻断原因
 show the status in BI
 include a manual-review note in the owner email
+create a 待复核观察 with reason = 诊断失败，需人工复核
+do not generate a formal action plan or fabricated Word report
 keep the boss package generation running if the base BI/tables are valid
 ```
 
 Formal-send rule:
 
 ```text
-do not send formal weekly email until tables, BI, package selection, diagnosis index, recipient scoping, and all core diagnosis rows have passed validation
+do not send formal weekly email until base tables, BI, package selection, diagnosis index and recipient scoping pass validation
+an individual ASIN diagnosis failure blocks only that ASIN diagnosis attachment and formal action plan; it does not block other validated owners or the boss package
 allow formal sending when only auxiliary evidence gaps remain
 ```
 

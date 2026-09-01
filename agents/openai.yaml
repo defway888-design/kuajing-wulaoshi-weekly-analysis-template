@@ -1,7 +1,7 @@
 interface:
   display_name: "跨境吴老师周数据分析Skill"
-  short_description: "父商品周度异动、高优先级拆分、30天缓慢趋势诊断、证据缺口闸门、BI生成与权限邮件分发"
-  default_prompt: "Use $kuajing-wulaoshi-weekly-analysis to run this week's parent-ASIN single-period and 30-day dual-window trend anomaly analysis, classify current and slow high-priority anomalies, generate BI dashboards, apply the core-diagnosis/evidence-gap send gate, and prepare high-priority diagnosis outputs in trial mode."
+  short_description: "父商品异动诊断、证据化行动建议、负责人在线表格、固定BI与权限邮件分发"
+  default_prompt: "Use $kuajing-wulaoshi-weekly-analysis to run this week's parent-ASIN anomaly analysis in trial mode, dispatch only the required high-priority diagnosis Skill, generate same-run structured evidence and evidence-based action suggestions, write each owner's authorized online action table with readback verification, and produce the fixed boss/owner BI and permission-scoped delivery outputs."
 
 dependencies:
   tools:

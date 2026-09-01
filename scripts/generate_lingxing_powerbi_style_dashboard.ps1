@@ -61,10 +61,16 @@ $Details = foreach ($Row in $RawDetails) {
         "父ASIN" = $Row.'父ASIN'
         "商品名" = $Row.'商品名'
         "异动指标" = $Row.'异动指标'
-        "当前值" = $Row.'当前值'
-        "上月值" = $Row.'上月值'
-        "变化率" = $Row.'变化率'
-        "异动识别方式" = $Row.'异动识别方式'
+        "异动来源" = Get-FieldValue $Row @("异动来源", "异动识别方式", "anomaly_source", "detection_mode")
+        "当前比较窗口" = Get-FieldValue $Row @("当前比较窗口", "current_window")
+        "基准比较窗口" = Get-FieldValue $Row @("基准比较窗口", "baseline_window", "previous_window")
+        "当前流量值" = Get-FieldValue $Row @("当前流量值", "current_traffic")
+        "基准流量值" = Get-FieldValue $Row @("基准流量值", "baseline_traffic", "previous_traffic")
+        "流量变化率" = Get-FieldValue $Row @("流量变化率", "traffic_change_rate")
+        "当前转化率" = Get-FieldValue $Row @("当前转化率", "current_conversion_rate")
+        "基准转化率" = Get-FieldValue $Row @("基准转化率", "baseline_conversion_rate", "previous_conversion_rate")
+        "转化率变化率" = Get-FieldValue $Row @("转化率变化率", "conversion_change_rate")
+        "异动识别方式" = Get-FieldValue $Row @("异动识别方式", "异动来源", "detection_mode", "anomaly_source")
         "趋势候选原因" = $Row.'趋势候选原因'
         "趋势判断窗口" = $Row.'趋势判断窗口'
         "历史判断" = $Row.'历史判断'
@@ -101,6 +107,15 @@ if (Test-Path -LiteralPath $DiagnosisIndexPath) {
             "商品名" = Get-FieldValue $_ @("商品名", "product_name")
             "异动指标" = Get-FieldValue $_ @("异动指标", "metric_type")
             "高优先级类型" = Get-FieldValue $_ @("高优先级类型", "high_priority_type")
+            "异动来源" = Get-FieldValue $_ @("异动来源", "异动识别方式", "anomaly_source", "detection_mode")
+            "当前比较窗口" = Get-FieldValue $_ @("当前比较窗口", "current_window")
+            "基准比较窗口" = Get-FieldValue $_ @("基准比较窗口", "baseline_window", "previous_window")
+            "当前流量值" = Get-FieldValue $_ @("当前流量值", "current_traffic")
+            "基准流量值" = Get-FieldValue $_ @("基准流量值", "baseline_traffic", "previous_traffic")
+            "流量变化率" = Get-FieldValue $_ @("流量变化率", "traffic_change_rate")
+            "当前转化率" = Get-FieldValue $_ @("当前转化率", "current_conversion_rate")
+            "基准转化率" = Get-FieldValue $_ @("基准转化率", "baseline_conversion_rate", "previous_conversion_rate")
+            "转化率变化率" = Get-FieldValue $_ @("转化率变化率", "conversion_change_rate")
             "诊断状态" = Get-FieldValue $_ @("诊断状态", "diagnosis_status")
             "核心诊断状态" = Get-FieldValue $_ @("核心诊断状态", "core_diagnosis_status")
             "可发送状态" = Get-FieldValue $_ @("可发送状态", "send_status")
@@ -112,6 +127,9 @@ if (Test-Path -LiteralPath $DiagnosisIndexPath) {
             "字段映射记录" = Get-FieldValue $_ @("字段映射记录", "field_mapping_log")
             "失败原因" = Get-FieldValue $_ @("失败原因", "failure_reason")
             "阻断原因" = Get-FieldValue $_ @("阻断原因", "blocking_reason")
+            "行动方案状态" = Get-FieldValue $_ @("行动方案状态", "action_plan_status")
+            "在线表格写入状态" = Get-FieldValue $_ @("在线表格写入状态", "online_table_write_status")
+            "在线表格地址" = Get-FieldValue $_ @("在线表格地址", "online_table_url")
         }
     })
 } else {
@@ -124,6 +142,15 @@ if (Test-Path -LiteralPath $DiagnosisIndexPath) {
             "商品名" = $_.'商品名'
             "异动指标" = $_.'异动指标'
             "高优先级类型" = $_.'高优先级类型'
+            "异动来源" = $_.'异动来源'
+            "当前比较窗口" = $_.'当前比较窗口'
+            "基准比较窗口" = $_.'基准比较窗口'
+            "当前流量值" = $_.'当前流量值'
+            "基准流量值" = $_.'基准流量值'
+            "流量变化率" = $_.'流量变化率'
+            "当前转化率" = $_.'当前转化率'
+            "基准转化率" = $_.'基准转化率'
+            "转化率变化率" = $_.'转化率变化率'
             "诊断状态" = "未生成"
             "核心诊断状态" = "未生成"
             "可发送状态" = "禁止发送"
@@ -135,6 +162,9 @@ if (Test-Path -LiteralPath $DiagnosisIndexPath) {
             "字段映射记录" = ""
             "失败原因" = ""
             "阻断原因" = "未生成诊断报告"
+            "行动方案状态" = "待复核观察"
+            "在线表格写入状态" = "未写入"
+            "在线表格地址" = ""
         }
     })
 }
@@ -447,7 +477,7 @@ tr:hover, tr.selected { background:rgba(255,255,255,.16); }
     <div class="panel pink table-panel review-detail-grid">
       <h2>待复核异动明细</h2>
       <div class="detail-title" id="reviewDetailTitle">当前显示全部待复核明细</div>
-      <div class="table-wrap"><table id="reviewDetailTable"><thead><tr><th>父ASIN</th><th class="product">商品名</th><th>异动指标</th><th>变化率</th><th>异动识别方式</th><th>趋势候选原因</th><th>趋势判断窗口</th><th>待复核原因</th><th>历史判断</th></tr></thead><tbody></tbody></table></div>
+      <div class="table-wrap"><table id="reviewDetailTable"><thead><tr><th>父ASIN</th><th class="product">商品名</th><th>异动指标</th><th>当前流量值</th><th>基准流量值</th><th>流量变化率</th><th>当前转化率</th><th>基准转化率</th><th>转化率变化率</th><th>异动来源</th><th>趋势判断窗口</th><th>待复核原因</th><th>历史判断</th></tr></thead><tbody></tbody></table></div>
     </div>
     <div class="panel pink table-panel detail-grid" style="display:none;">
       <h2>负责人汇总与异动明细</h2>
@@ -461,7 +491,7 @@ tr:hover, tr.selected { background:rgba(255,255,255,.16); }
       </div>
       <div class="table-wrap" style="margin-bottom:10px;"><table id="summaryTable"><thead><tr><th>站点</th><th>店铺</th><th>负责人</th><th class="num">异动商品数</th><th class="num">高优先级异动</th><th class="num">当期高优先异动</th><th class="num">缓慢高优先异动</th><th class="num">待复核异动</th></tr></thead><tbody></tbody></table></div>
       <div class="detail-title" id="detailTitle">当前显示全部明细</div>
-      <div class="table-wrap"><table id="detailTable"><thead><tr><th>站点</th><th>店铺</th><th>负责人</th><th>父ASIN</th><th class="product">商品名</th><th>异动指标</th><th>当前值</th><th>上月值</th><th>变化率</th><th>异动识别方式</th><th>趋势候选原因</th><th>趋势判断窗口</th><th>历史判断</th><th>待复核原因</th><th>最终状态</th><th>高优先级类型</th></tr></thead><tbody></tbody></table></div>
+      <div class="table-wrap"><table id="detailTable"><thead><tr><th>站点</th><th>店铺</th><th>负责人</th><th>父ASIN</th><th class="product">商品名</th><th>异动指标</th><th>异动来源</th><th>当前比较窗口</th><th>基准比较窗口</th><th>当前流量值</th><th>基准流量值</th><th>流量变化率</th><th>当前转化率</th><th>基准转化率</th><th>转化率变化率</th><th>趋势候选原因</th><th>趋势判断窗口</th><th>历史判断</th><th>待复核原因</th><th>最终状态</th><th>高优先级类型</th></tr></thead><tbody></tbody></table></div>
     </div>
   </section>
 </main>
@@ -726,8 +756,8 @@ function renderDetails() {
   detailTitle.textContent = selectedKey ? `${selectedKey.replaceAll("||", " / ")}${selectedStatus ? " / " + selectedStatus : ""}：${rows.length} 条` : `${selectedStatus || "全部明细"}：${rows.length} 条`;
   detailTable.querySelector("tbody").innerHTML = rows.map(row => `<tr>
     <td>${esc(row["站点"])}</td><td>${esc(row["店铺"])}</td><td>${esc(row["负责人"])}</td><td>${esc(row["父ASIN"])}</td>
-    <td>${esc(row["商品名"])}</td><td>${esc(row["异动指标"])}</td><td>${esc(row["当前值"])}</td><td>${esc(row["上月值"])}</td>
-    <td>${esc(row["变化率"])}</td><td>${esc(row["异动识别方式"])}</td><td>${esc(row["趋势候选原因"])}</td><td>${esc(row["趋势判断窗口"])}</td><td>${esc(row["历史判断"])}</td><td>${esc(reviewReason(row))}</td><td class="${row["最终状态"] === "高优先级异动" ? "status-high" : "status-review"}">${esc(row["最终状态"])}</td><td>${esc(row["高优先级类型"])}</td>
+    <td>${esc(row["商品名"])}</td><td>${esc(row["异动指标"])}</td><td>${esc(row["异动来源"] || row["异动识别方式"])}</td><td>${esc(row["当前比较窗口"])}</td><td>${esc(row["基准比较窗口"])}</td>
+    <td>${esc(row["当前流量值"])}</td><td>${esc(row["基准流量值"])}</td><td>${esc(row["流量变化率"])}</td><td>${esc(row["当前转化率"])}</td><td>${esc(row["基准转化率"])}</td><td>${esc(row["转化率变化率"])}</td><td>${esc(row["趋势候选原因"])}</td><td>${esc(row["趋势判断窗口"])}</td><td>${esc(row["历史判断"])}</td><td>${esc(reviewReason(row))}</td><td class="${row["最终状态"] === "高优先级异动" ? "status-high" : "status-review"}">${esc(row["最终状态"])}</td><td>${esc(row["高优先级类型"])}</td>
   </tr>`).join("");
 }
 function renderReviewDetails() {
@@ -736,7 +766,7 @@ function renderReviewDetails() {
   reviewDetailTitle.textContent = selectedKey ? `${selectedKey.replaceAll("||", " / ")}${reasonText}：${rows.length} 条待复核` : `待复核异动明细${reasonText}：${rows.length} 条`;
   reviewDetailTable.querySelector("tbody").innerHTML = rows.map(row => `<tr>
     <td>${esc(row["父ASIN"])}</td><td>${esc(row["商品名"])}</td><td>${esc(row["异动指标"])}</td>
-    <td>${esc(row["变化率"])}</td><td>${esc(row["异动识别方式"])}</td><td>${esc(row["趋势候选原因"])}</td><td>${esc(row["趋势判断窗口"])}</td><td>${esc(reviewReason(row))}</td><td>${esc(row["历史判断"])}</td>
+    <td>${esc(row["当前流量值"])}</td><td>${esc(row["基准流量值"])}</td><td>${esc(row["流量变化率"])}</td><td>${esc(row["当前转化率"])}</td><td>${esc(row["基准转化率"])}</td><td>${esc(row["转化率变化率"])}</td><td>${esc(row["异动来源"] || row["异动识别方式"])}</td><td>${esc(row["趋势判断窗口"])}</td><td>${esc(reviewReason(row))}</td><td>${esc(row["历史判断"])}</td>
   </tr>`).join("");
 }
 function renderButtons() { document.querySelectorAll("button[data-status]").forEach(btn => btn.classList.toggle("active", btn.dataset.status === selectedStatus)); }

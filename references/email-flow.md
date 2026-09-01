@@ -2,6 +2,8 @@
 
 Use this reference when implementing weekly email distribution.
 
+For owner online-table delivery, platform recognition, authorization, writeback, readback, retries, and failure isolation, `references/online-table-delivery.md` is authoritative. If older wording in this file conflicts with that contract, use the online-table contract.
+
 ## Delivery Activation
 
 Default mode:
@@ -73,9 +75,9 @@ Boss package rules:
 
 ```text
 default: send one complete zip package
-complete package includes 负责人BI, 负责人汇总表, 异动明细表, 高优先级ASIN诊断报告索引.csv, ASIN diagnosis summary pages, and full Word diagnosis reports
+complete package includes 负责人BI, 负责人汇总表, 异动明细表, 高优先级ASIN诊断报告索引.csv, ASIN diagnosis summary pages, full Word diagnosis reports, 系统行动建议审计快照.csv, and 负责人在线表格投递状态.csv
 if complete package exceeds the usable sender-provider threshold: send one light package instead
-light package includes 负责人BI, 负责人汇总表, 异动明细表, 高优先级ASIN诊断报告索引.csv, and ASIN diagnosis summary pages only
+light package includes 负责人BI, 负责人汇总表, 异动明细表, 高优先级ASIN诊断报告索引.csv, ASIN diagnosis summary pages, 系统行动建议审计快照.csv, and 负责人在线表格投递状态.csv only
 do not split the boss package into multi-volume archives
 ```
 
@@ -94,8 +96,11 @@ Owners receive:
 ```text
 their own 异动明细表
 their own 异动明细BI
-their own high-priority ASIN Word diagnosis reports
+their own online action-table link and verified writeback status
+their own high-priority ASIN Word diagnosis reports only when the diagnosis attachment status allows sending
 ```
+
+Do not attach `行动方案建议表_<负责人>.csv`. System suggestions are written to each owner's configured online table and the email carries the link.
 
 Never send full-scope HTML to an owner with only a default filter applied. Owner-specific HTML must embed only that owner’s data.
 
@@ -113,6 +118,9 @@ High-priority diagnosis failures:
 include the ASIN and failure status in the owner email body
 do not fabricate a Word report
 keep the diagnosis index row for audit
+create a 待复核观察 action row with the evidence gap and review requirement
+do not create a formal P0/P1 action suggestion
+continue processing other ASINs, other owners, and the boss package
 ```
 
 High-priority diagnosis evidence gaps:
@@ -131,6 +139,7 @@ Current LingXing MCP does not expose owner email lookup. Use:
 ```text
 config/owner_email_map.csv
 config/recipient_config.json
+config/owner_delivery_map.csv
 ```
 
 Recommended `owner_email_map.csv` columns:
@@ -158,6 +167,22 @@ owner_name
 
 Upgrade to `owner_name + site + store` if duplicate owner names need different emails.
 
+Recommended `owner_delivery_map.csv` columns:
+
+```text
+owner_name
+site
+store
+email
+online_table_url
+online_table_platform
+mcp_connection_name
+active
+first_seen_at
+last_verified_at
+remark
+```
+
 ## Owner Resignation Or Handover
 
 When a parent ASIN owner changes between the previous period and current period, the current owner is the report recipient.
@@ -184,8 +209,8 @@ After every analysis run:
 ```text
 1. extract owners from current 异动明细表
 2. read owner_email_map.csv
-3. detect missing/new/inactive owners
-4. prompt operator for each missing owner
+3. detect missing/new/inactive owners and missing online-table mappings
+4. prompt operator for each missing email or online-table link
 ```
 
 Prompt should show:
@@ -200,12 +225,15 @@ Prompt should show:
 缓慢高优先异动
 待复核异动
 高优先级诊断报告数
+在线行动表链接
+识别到的平台
 ```
 
 Accepted inputs:
 
 ```text
 valid email: save email and active = 1
+valid online-table URL: detect the platform, verify the matching MCP authorization, perform a test write/readback, then save the mapping
 multiple emails: separate by semicolon
 skip: active = 0, prompt again next run
 manager: send owner package to management email, role = manager_proxy
@@ -219,6 +247,7 @@ Before sending, print:
 ```text
 boss management email
 owner -> email mapping
+owner -> online-table mapping and platform
 missing owners
 attachments to be sent
 boss package type: complete | light
@@ -226,6 +255,8 @@ boss package size and usable threshold
 owner diagnosis attachments or owner diagnosis zip
 diagnosis failures needing manual review
 diagnosis evidence gaps that are still sendable
+online-table write/readback failures
+action rule version, batch version, and aggregate hash
 ```
 
 Require:

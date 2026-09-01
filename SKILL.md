@@ -1,6 +1,6 @@
 ---
 name: kuajing-wulaoshi-weekly-analysis
-description: Build and operate the 跨境吴老师周数据分析 workflow for weekly parent-ASIN anomaly review. Use when Codex needs to calculate single-period or 30-day dual-window trend traffic/conversion anomalies, run high-priority ASIN diagnosis routing, generate Word diagnosis reports, generate 负责人BI and 异动明细BI outputs, split owner-only dashboards, package boss/owner email attachments, guide sender mailbox setup, configure weekly email delivery, or maintain the fixed rules, schemas, templates, and permissions for this branded workflow.
+description: Build and operate the 跨境吴老师周数据分析 workflow for weekly parent-ASIN anomaly review. Use when Codex needs to calculate single-period or 30-day dual-window trend traffic/conversion anomalies, route high-priority ASIN diagnosis, generate evidence-based action suggestions, write owner-scoped online action tables, generate Word diagnosis reports and fixed BI dashboards, package boss/owner email deliveries, configure recurring delivery, or maintain the fixed rules, schemas, templates, and permissions for this branded workflow.
 ---
 
 # 跨境吴老师周数据分析Skill
@@ -40,6 +40,10 @@ Default progress messages:
 跨境吴老师正在判断30天双窗口趋势异动...
 跨境吴老师正在识别高优先级ASIN...
 跨境吴老师正在生成高优先级ASIN诊断报告...
+跨境吴老师正在生成系统行动建议...
+跨境吴老师正在检查负责人行动表格...
+跨境吴老师正在写入行动方案在线表格...
+跨境吴老师正在验证行动方案回写结果...
 跨境吴老师正在生成负责人汇总表...
 跨境吴老师正在生成负责人BI...
 跨境吴老师正在生成异动明细BI...
@@ -59,6 +63,18 @@ Default progress messages:
 - Use only `高优先级异动` and `待复核异动` as final statuses.
 - Split `高优先级异动` into `当期高优先异动` and `缓慢高优先异动` with the `高优先级类型` field.
 - `缓慢异动` / `30天双窗口趋势异动` belongs under `高优先级异动`, not `待复核异动`.
+- `流量+转化率异动` is one parent-ASIN project and one action-plan record; never split it into two action records.
+- Generate system action suggestions only in this main Skill. Diagnosis Skills provide evidence only; owner execution does not regenerate system suggestions.
+
+## Extension Contracts
+
+Read these references before processing high-priority diagnosis, action suggestions, online tables, or formal email:
+
+- `references/diagnosis-integration-contract.md`
+- `references/action-plan-contract.md`
+- `references/online-table-delivery.md`
+
+These three references take precedence over older wording in this file, `business-spec.md`, `high-priority-diagnosis-flow.md`, and `email-flow.md` where the wording conflicts.
 
 ## Fixed Data Source
 
@@ -180,9 +196,9 @@ Core fields are required for anomaly calculation and formal sending:
 店铺
 父ASIN
 当前周期流量
-当前周期订单量
+当前周期成交量（volume）
 上月周期流量
-上月周期订单量
+上月周期成交量（volume）
 周期天数
 当前周期日期范围
 上月周期日期范围
@@ -224,7 +240,7 @@ Default semantic mappings:
 | SKU | seller_sku | msku, sku | no |
 | Seller ID | seller_id | sid, sellerId | no |
 | 流量 | sessions | sessions_total, traffic | yes |
-| 订单量 | order_count | volume, sales, units_ordered | yes |
+| 成交量（volume） | volume | order_count, sales, units_ordered | yes |
 | 商品名 | product_name | title, item_name | no |
 | 负责人 | owner | principal_name, principal_names | no |
 | 主图 | main_image | image, image_url | no |
@@ -441,6 +457,8 @@ Dispatch strictly by `异动指标`:
 
 Do not call both diagnosis Skills for every high-priority ASIN. The diagnosis Skills consume substantial compute, so the trigger must match the anomaly type.
 
+Before dispatching, read `references/diagnosis-integration-contract.md`. It fixes the required windows, six metric values, same-run structured evidence, combined-report rule and failure isolation behavior.
+
 Diagnosis Skill repositories:
 
 ```text
@@ -481,6 +499,18 @@ Word报告地址
 字段映射记录
 失败原因
 阻断原因
+异动来源
+当前比较窗口
+基准比较窗口
+当前流量值
+基准流量值
+流量变化率
+当前转化率
+基准转化率
+转化率变化率
+行动方案状态
+在线表格写入状态
+在线表格地址
 ```
 
 Allowed `诊断状态` values:
@@ -525,8 +555,13 @@ set 可发送状态 = 禁止发送
 write the failure reason into 高优先级ASIN诊断报告索引.csv
 do not fabricate a Word report
 show the failed ASIN in BI with the failure status
+generate 待复核观察 with reason = 诊断失败，需人工复核
+do not generate a formal action plan
 include a manual-review note in the owner email
+continue other ASINs, validated owners and the boss package
 ```
+
+`可发送状态` above applies to the ASIN diagnosis attachment only. It must not block a validated owner’s BI/detail/table email or the boss package.
 
 If Seller ID, main image, five bullet points, fulfillment type, off-site promotion evidence, affiliate promotion evidence, or strict similar-competitor review cannot be confirmed:
 
@@ -554,6 +589,23 @@ show it in 负责人BI
 route handling to the boss management package
 mark recipient role as manager_proxy
 ```
+
+## Action Suggestions And Online Tables
+
+After anomaly identification and high-priority diagnosis, execute this fixed order:
+
+```text
+1. Normalize diagnosis status and structured evidence by references/diagnosis-integration-contract.md
+2. Generate one evidence-based system action suggestion or one pending-review observation by references/action-plan-contract.md
+3. Obtain or validate the current owner’s unique online table link
+4. Detect the link platform and verify its MCP connection, authorization, write and readback capabilities
+5. Write system-only fields, read them back, then generate BI/package/email outputs
+6. Send only after the owner’s required table write/readback and recipient scope checks pass
+```
+
+All anomaly rows, including rows that only produce `待复核观察`, require an owner table link before owner-specific email delivery. A missing or failed table only blocks that owner; it does not block validated owners or the boss package.
+
+Do not add an action-plan module to either BI. The BI keeps its current fixed modules and continues to show compact high-priority diagnosis entries only.
 
 ## Fixed Output Tables
 
@@ -602,9 +654,15 @@ Columns:
 父ASIN
 商品名
 异动指标
-当前值
-上月值
-变化率
+异动来源
+当前比较窗口
+基准比较窗口
+当前流量值
+基准流量值
+流量变化率
+当前转化率
+基准转化率
+转化率变化率
 异动识别方式
 趋势候选原因
 趋势判断窗口
@@ -613,6 +671,19 @@ Columns:
 最终状态
 高优先级类型
 ```
+
+The six traffic/conversion value fields are required for every anomaly row, including traffic-only and conversion-only anomalies. They support the action-direction matrix. If any value is genuinely unavailable, write `未获取` and use `待复核观察`; do not leave the field blank or infer it.
+
+### 行动与投递审计表
+
+Always generate:
+
+```text
+系统行动建议审计快照.csv
+负责人在线表格投递状态.csv
+```
+
+The action audit snapshot follows `references/action-plan-contract.md`. The delivery-status table follows `references/online-table-delivery.md`. These are boss/audit outputs and must not be attached to another owner's email.
 
 Allowed `最终状态` values:
 
@@ -740,8 +811,10 @@ default: send one complete zip package
 package name pattern: {reporting_period}_运营数据汇总.zip
 complete package includes 负责人BI, summary/detail tables, diagnosis index, ASIN diagnosis summary pages, and full Word diagnosis reports
 if complete package exceeds the usable sender attachment threshold, automatically send a light summary package
-light package includes 负责人BI, summary/detail tables, diagnosis index, and ASIN diagnosis summary pages only
+light package includes 负责人BI, summary/detail tables, diagnosis index, ASIN diagnosis summary pages, action summary audit, and owner online-table delivery status; it excludes full Word reports
 ```
+
+Both package types must also include the action-suggestion audit material required by `references/online-table-delivery.md`. The complete package contains the full audit snapshot; the light package contains action counts, direction summaries, table-write states and diagnosis summary pages only.
 
 Boss BI links must be relative paths inside the zip package. The boss should download and unzip the package first, then open the BI. In the light package, BI report links open the ASIN diagnosis summary page, not the full Word report.
 
@@ -752,7 +825,8 @@ Each owner receives:
 ```text
 that owner’s 异动明细表
 that owner’s 异动明细BI
-that owner’s high-priority ASIN Word diagnosis reports
+that owner’s online action-table link and write/readback status
+that owner’s high-priority ASIN Word diagnosis reports when the diagnosis attachment is sendable
 ```
 
 Owner dashboards must not contain other owners’ data.
@@ -764,6 +838,10 @@ few reports and under threshold -> attach Word reports one by one
 too many reports or over threshold -> compress that owner’s Word reports into one zip
 if the owner package still exceeds threshold -> send the owner BI/detail data plus a manual follow-up note
 ```
+
+Never attach `行动方案建议表_<负责人>.csv`. The owner online table is the formal action-plan carrier.
+
+For a diagnosis failure or pending-review observation, still send the owner’s scoped BI/detail/table link after the table write/readback succeeds; do not attach or fabricate a diagnosis Word report.
 
 Attachment size threshold:
 
@@ -855,6 +933,13 @@ diagnosis index rows match high-priority ASIN scope
 BI report links use relative package paths, not absolute local paths
 老板完整包 or 老板轻量包 is selected by provider attachment threshold
 owner emails include only that owner’s data and allowed diagnosis attachments
+all anomaly rows have a matching action-plan status: 正式行动方案 or 待复核观察
+formal action plans include at least one P0 or P1 action and all five system evaluation fields
+pending-review observations contain no fabricated controllable actions or P0/P1
+same record key/version/hash does not create duplicate table records
+online table rows pass write/readback verification before owner email
+each owner table URL is unique and matches that owner’s scope
+one owner table or diagnosis failure does not block validated owners or the boss package
 ```
 
 ## Packaged Resources
@@ -869,6 +954,7 @@ scripts/validate_weekly_analysis_outputs.ps1
 ```
 
 Use `references/trend-anomaly-flow.md` for the locked 30-day dual-window trend anomaly logic.
+Use `references/diagnosis-integration-contract.md`, `references/action-plan-contract.md`, and `references/online-table-delivery.md` for diagnosis evidence, action generation, online table writing, and formal delivery.
 
 The `lingxing` text in script file names is technical implementation detail only. Do not expose it as the skill brand.
 
@@ -898,4 +984,7 @@ Read these only when needed:
 - `references/email-flow.md`: email distribution and owner email entry flow.
 - `references/email-provider-routing.md`: sender mailbox provider detection and guided setup.
 - `references/high-priority-diagnosis-flow.md`: high-priority ASIN diagnosis, Word reports, BI links, and package rules.
+- `references/diagnosis-integration-contract.md`: fixed high-priority diagnosis inputs, outputs and status mapping.
+- `references/action-plan-contract.md`: system action suggestion, P0/P1, evaluation field, version and hash rules.
+- `references/online-table-delivery.md`: owner table setup, platform MCP checks, write/readback, retry and email rules.
 - `references/online-template-distribution.md`: multi-user online template distribution model.

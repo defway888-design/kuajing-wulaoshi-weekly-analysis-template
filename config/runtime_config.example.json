@@ -30,9 +30,9 @@
       "店铺",
       "父ASIN",
       "当前周期流量",
-      "当前周期订单量",
+      "当前周期成交量（volume）",
       "上月周期流量",
-      "上月周期订单量",
+      "上月周期成交量（volume）",
       "周期天数",
       "当前周期日期范围",
       "上月周期日期范围"
@@ -56,7 +56,7 @@
       "SKU": ["seller_sku", "msku", "sku"],
       "Seller ID": ["seller_id", "sid", "sellerId"],
       "流量": ["sessions", "sessions_total", "traffic"],
-      "订单量": ["order_count", "volume", "sales", "units_ordered"],
+      "成交量": ["volume", "order_count", "sales", "units_ordered"],
       "商品名": ["product_name", "title", "item_name"],
       "负责人": ["owner", "principal_name", "principal_names"],
       "主图": ["main_image", "image", "image_url"],
@@ -90,7 +90,9 @@
     ],
     "requires_validated_tables": true,
     "requires_validated_bi": true,
-    "requires_recipient_scope_validation": true
+    "requires_recipient_scope_validation": true,
+    "diagnosis_failure_scope": "affected_asin_attachment_only",
+    "owner_delivery_failure_scope": "affected_owner_only"
   },
   "high_priority_diagnosis": {
     "enabled_for_status": "高优先级异动",
@@ -103,11 +105,70 @@
     "report_format": "docx",
     "report_output_dir": "<runtime-local-output-directory>/diagnosis_reports/<reporting_period>",
     "diagnosis_index_path": "<runtime-local-output-directory>/高优先级ASIN诊断报告索引.csv",
+    "structured_evidence_contract": "references/diagnosis-integration-contract.md",
+    "structured_evidence_source": "same_run_shared_object",
+    "word_report_parsing_for_evidence": false,
     "dispatch_rule": {
       "流量异动": "traffic_only",
       "转化率异动": "conversion_only",
       "流量+转化率异动": "traffic_and_conversion_combined"
     }
+  },
+  "action_plan": {
+    "enabled": true,
+    "contract": "references/action-plan-contract.md",
+    "generator_owner": "weekly_main_skill_only",
+    "rule_version": "action-rule-v2.0.0",
+    "batch_version": "<generated-per-reporting-period>",
+    "record_key_fields": [
+      "报告周期",
+      "站点",
+      "店铺",
+      "负责人姓名",
+      "父ASIN",
+      "异动指标"
+    ],
+    "combined_anomaly_policy": "one_project_not_split",
+    "allowed_statuses": [
+      "正式行动方案",
+      "待复核观察"
+    ],
+    "hashes": [
+      "内容哈希",
+      "在线记录哈希",
+      "批次汇总哈希"
+    ],
+    "audit_snapshot_path": "<runtime-local-output-directory>/系统行动建议审计快照.csv",
+    "human_fields_overwrite_allowed": false
+  },
+  "online_table_delivery": {
+    "enabled": true,
+    "contract": "references/online-table-delivery.md",
+    "owner_delivery_map_path": "<runtime-local-owner-delivery-map.csv>",
+    "supported_platforms": [
+      "feishu",
+      "tencent_docs",
+      "google_sheets",
+      "excel_online",
+      "wps"
+    ],
+    "platform_detection": "from_submitted_url",
+    "required_capabilities": [
+      "mcp_connected",
+      "authorized",
+      "write",
+      "readback"
+    ],
+    "browser_simulation_fallback": false,
+    "retry_minutes": [1, 5, 15],
+    "unique_table_per_owner": true,
+    "shared_asin_delivery": "write_to_every_responsible_owner_table",
+    "batch_statuses": [
+      "完整完成",
+      "部分完成",
+      "失败"
+    ],
+    "delivery_status_path": "<runtime-local-output-directory>/负责人在线表格投递状态.csv"
   },
   "trend_anomaly": {
     "enabled": true,
@@ -133,8 +194,11 @@
     "attachment_safety_ratio": 0.7,
     "boss_default_package": "complete_zip",
     "boss_oversize_package": "light_zip",
+    "include_action_audit_snapshot": true,
+    "include_owner_online_table_status": true,
     "owner_small_report_mode": "individual_docx_attachments",
-    "owner_many_report_mode": "owner_diagnosis_zip"
+    "owner_many_report_mode": "owner_diagnosis_zip",
+    "owner_action_csv_attachment": false
   },
   "owner_email_map_path": "<runtime-local-owner-email-map.csv>",
   "automation": {
