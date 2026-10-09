@@ -39,6 +39,7 @@ Default progress messages:
 跨境吴老师正在筛选30天趋势候选商品...
 跨境吴老师正在判断30天双窗口趋势异动...
 跨境吴老师正在识别高优先级ASIN...
+跨境吴老师正在检查各站点报告时区...
 跨境吴老师正在生成高优先级ASIN诊断报告...
 跨境吴老师正在生成系统行动建议...
 跨境吴老师正在检查负责人行动表格...
@@ -459,6 +460,8 @@ Do not call both diagnosis Skills for every high-priority ASIN. The diagnosis Sk
 
 Before dispatching, read `references/diagnosis-integration-contract.md`. It fixes the required windows, six metric values, same-run structured evidence, combined-report rule and failure isolation behavior.
 
+Before diagnosis, confirm the Amazon report timezone for each affected site/store from the exact reporting data's metadata or an explicit user-confirmed reporting setting. Record the timezone and its source in this batch, then pass both with the unchanged current/comparison windows to every required diagnosis Skill. Do not infer a timezone from the computer, account locale or marketplace country. If it remains unconfirmed, mark only affected records as diagnosis failures and `待复核观察`; keep P0/P1 empty and continue other records. The diagnosis index must preserve the missing-timezone reason.
+
 Diagnosis Skill repositories:
 
 ```text
@@ -502,6 +505,8 @@ Word报告地址
 异动来源
 当前比较窗口
 基准比较窗口
+报告时区
+报告时区来源
 当前流量值
 基准流量值
 流量变化率

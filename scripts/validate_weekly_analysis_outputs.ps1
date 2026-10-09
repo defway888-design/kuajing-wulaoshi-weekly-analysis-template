@@ -133,7 +133,7 @@ if ($Errors.Count -eq 0) {
 
     if (Test-Path -LiteralPath $DiagnosisIndexPath) {
         $DiagnosisRows = @(Import-Csv -LiteralPath $DiagnosisIndexPath)
-        Require-Columns $DiagnosisRows @("站点", "店铺", "负责人", "父ASIN", "商品名", "异动指标", "高优先级类型", "异动来源", "当前比较窗口", "基准比较窗口", "当前流量值", "基准流量值", "流量变化率", "当前转化率", "基准转化率", "转化率变化率", "诊断状态", "核心诊断状态", "可发送状态", "报告类型", "摘要页地址", "Word报告地址", "证据缺口类型", "证据缺口说明", "字段映射记录", "失败原因", "阻断原因", "行动方案状态", "在线表格写入状态", "在线表格地址") "高优先级ASIN诊断报告索引"
+        Require-Columns $DiagnosisRows @("站点", "店铺", "负责人", "父ASIN", "商品名", "异动指标", "高优先级类型", "异动来源", "当前比较窗口", "基准比较窗口", "报告时区", "报告时区来源", "当前流量值", "基准流量值", "流量变化率", "当前转化率", "基准转化率", "转化率变化率", "诊断状态", "核心诊断状态", "可发送状态", "报告类型", "摘要页地址", "Word报告地址", "证据缺口类型", "证据缺口说明", "字段映射记录", "失败原因", "阻断原因", "行动方案状态", "在线表格写入状态", "在线表格地址") "高优先级ASIN诊断报告索引"
         if ($HighPriorityDetailCount -gt 0 -and $DiagnosisRows.Count -lt $HighPriorityDetailCount) {
             Add-Error "高优先级诊断索引行数少于高优先级明细行数"
         }
@@ -167,6 +167,22 @@ if ($Errors.Count -eq 0) {
             }
             if ($Row.'核心诊断状态' -in @("阻断失败", "未生成") -and $Row.'可发送状态' -ne "禁止发送") {
                 Add-Error "诊断索引发送状态错误：$($Row.'父ASIN') 核心诊断状态为 $($Row.'核心诊断状态') 时应禁止发送"
+            }
+            if ($Row.'核心诊断状态' -in @("完整完成", "可用但有证据缺口")) {
+                if ([string]::IsNullOrWhiteSpace($Row.'报告时区') -or $Row.'报告时区' -eq "未获取" -or [string]::IsNullOrWhiteSpace($Row.'报告时区来源') -or $Row.'报告时区来源' -eq "未获取") {
+                    Add-Error "已完成诊断缺少已确认的报告时区或来源：$($Row.'父ASIN')"
+                }
+            }
+            if ($Row.'核心诊断状态' -in @("阻断失败", "未生成")) {
+                if ($Row.'行动方案状态' -ne "待复核观察") {
+                    Add-Error "诊断阻断项目必须进入待复核观察：$($Row.'父ASIN')"
+                }
+                if (-not [string]::IsNullOrWhiteSpace($Row.'Word报告地址')) {
+                    Add-Error "诊断阻断项目不得引用正式Word报告：$($Row.'父ASIN')"
+                }
+            }
+            if ($Row.'阻断原因' -match "报告时区" -and ($Row.'报告时区' -ne "未获取" -or $Row.'报告时区来源' -ne "未获取")) {
+                Add-Error "报告时区阻断项目的时区与来源应标记未获取：$($Row.'父ASIN')"
             }
             if ($Row.'核心诊断状态' -eq "可用但有证据缺口" -and [string]::IsNullOrWhiteSpace($Row.'证据缺口类型')) {
                 Add-Error "诊断索引证据缺口状态缺少证据缺口类型：$($Row.'父ASIN')"

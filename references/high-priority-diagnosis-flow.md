@@ -51,6 +51,8 @@ Cost-control rule:
 Never call both diagnosis Skills unless 异动指标 = 流量+转化率异动.
 ```
 
+Resolve and pass the report timezone and its source for each site/store before diagnosis, as required by `diagnosis-integration-contract.md`. An unresolved timezone affects only the corresponding records: record their blocker, leave their Word path empty, generate pending-review observations without P0/P1, and continue other records.
+
 ## Report Output
 
 Generate one standalone Word report per high-priority ASIN.
@@ -106,6 +108,8 @@ Word报告地址
 异动来源
 当前比较窗口
 基准比较窗口
+报告时区
+报告时区来源
 当前流量值
 基准流量值
 流量变化率
