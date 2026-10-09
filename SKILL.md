@@ -448,6 +448,8 @@ High-priority diagnosis includes both:
 
 30-day dual-window trend anomalies must enter this diagnosis flow as `缓慢高优先异动`.
 
+For an already confirmed `缓慢高优先异动` with a declining conversion component and/or declining traffic component, run the auxiliary return-rate check specified in `references/diagnosis-integration-contract.md`. Its two contiguous 30-day return windows are not the early/late 7-day windows used to detect the trend. A return-rate hit never creates a new anomaly row, changes the anomaly threshold, or triggers continuous monitoring.
+
 Dispatch strictly by `异动指标`:
 
 ```text
@@ -458,7 +460,7 @@ Dispatch strictly by `异动指标`:
 
 Do not call both diagnosis Skills for every high-priority ASIN. The diagnosis Skills consume substantial compute, so the trigger must match the anomaly type.
 
-Before dispatching, read `references/diagnosis-integration-contract.md`. It fixes the required windows, six metric values, same-run structured evidence, combined-report rule and failure isolation behavior.
+Before dispatching, read `references/diagnosis-integration-contract.md`. It fixes the required windows, six metric values, conditional return-rate evidence reuse, same-run structured evidence, combined-report rule and failure isolation behavior.
 
 Before diagnosis, confirm the Amazon report timezone for each affected site/store from the exact reporting data's metadata or an explicit user-confirmed reporting setting. Record the timezone and its source in this batch, then pass both with the unchanged current/comparison windows to every required diagnosis Skill. Do not infer a timezone from the computer, account locale or marketplace country. If it remains unconfirmed, mark only affected records as diagnosis failures and `待复核观察`; keep P0/P1 empty and continue other records. The diagnosis index must preserve the missing-timezone reason.
 

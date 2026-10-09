@@ -1,7 +1,7 @@
 {
   "template_name": "kuajing-wulaoshi-weekly-analysis",
-  "template_version": "2.1.0",
-  "rules_version": "weekly-parent-asin-anomaly-and-action-v2.1",
+  "template_version": "2.2.0",
+  "rules_version": "weekly-parent-asin-anomaly-and-action-v2.2",
   "schema_version": "weekly-bi-output-v2.1",
   "style_version": "manager-and-owner-bi-v1.6",
   "brand_name": "跨境吴老师",
